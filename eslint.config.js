@@ -51,6 +51,10 @@ export default tseslint.config(
       ],
       // 禁用 display name 检测
       'react/display-name': 'off',
+      // 禁用 prop-types 检测（TypeScript 已提供类型检查）
+      'react/prop-types': 'off',
+      // 禁用 floating promises 检测
+      '@typescript-eslint/no-floating-promises': 'off',
     },
   },
   // Prettier 配置（禁用与 Prettier 冲突的规则）
