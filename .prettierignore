@@ -1,0 +1,34 @@
+# 依赖
+node_modules
+
+# 构建输出
+dist
+dist-electron
+build
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 编辑器
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+
+# 锁文件
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

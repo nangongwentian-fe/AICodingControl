@@ -1,18 +1,15 @@
-import { memo } from "react";
-import Header from "./components/Header/Header";
-import "./App.module.scss";
+import { memo } from 'react';
+import WindowHeader from './components/WindowHeader';
+import './App.module.scss';
+import MainContent from './layouts/MainContent';
 
 const App = memo(() => {
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <Header />
-      <div className="flex-1 p-8">
-        <div className="text-center">
-          <h1 className="mb-4 text-4xl font-bold text-gray-900">
-            Antigravity Tools
-          </h1>
-        </div>
-      </div>
+    <div className="flex h-screen flex-col bg-gray-50">
+      {/* 窗体Header */}
+      <WindowHeader />
+      {/* Main content */}
+      <MainContent />
     </div>
   );
 });

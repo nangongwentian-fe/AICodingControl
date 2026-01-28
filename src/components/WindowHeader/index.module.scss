@@ -26,15 +26,3 @@
 .headerContent * {
   -webkit-app-region: no-drag;
 }
-
-/* 暗黑模式支持 */
-@media (prefers-color-scheme: dark) {
-  .customHeader {
-    background-color: #2d2d2d;
-    border-bottom: 1px solid #404040;
-  }
-  
-  .headerTitle {
-    color: #e0e0e0;
-  }
-}
