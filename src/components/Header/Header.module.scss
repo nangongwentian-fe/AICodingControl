@@ -1,0 +1,40 @@
+.customHeader {
+  position: relative;
+  height: 32px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.headerContent {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.headerTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* 确保内容区域不影响拖动 */
+.headerContent * {
+  -webkit-app-region: no-drag;
+}
+
+/* 暗黑模式支持 */
+@media (prefers-color-scheme: dark) {
+  .customHeader {
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #404040;
+  }
+  
+  .headerTitle {
+    color: #e0e0e0;
+  }
+}
