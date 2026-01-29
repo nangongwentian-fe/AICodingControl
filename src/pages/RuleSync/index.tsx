@@ -36,7 +36,7 @@ const RuleSync = memo(() => {
       <div className="mt-4 grid grid-cols-4 gap-4">
         {AI_TOOLS.map(tool => (
           <Card key={tool.key} title={tool.name} hoverable>
-            {tool.name}
+            <img src={tool.logo} alt={tool.name} className="h-12 w-12 object-contain" />
           </Card>
         ))}
       </div>
