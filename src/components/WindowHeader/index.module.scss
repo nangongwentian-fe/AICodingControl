@@ -8,21 +8,3 @@
   -webkit-app-region: drag;
   user-select: none;
 }
-
-.headerContent {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-}
-
-.headerTitle {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-}
-
-/* 确保内容区域不影响拖动 */
-.headerContent * {
-  -webkit-app-region: no-drag;
-}

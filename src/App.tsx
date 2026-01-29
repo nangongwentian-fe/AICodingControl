@@ -4,6 +4,7 @@ import Header from './components/Header';
 import WindowHeader from './components/WindowHeader';
 import { routes } from './router/routes';
 import './App.module.scss';
+import { Layout } from 'antd';
 
 const AppRoutes = memo(() => {
   const element = useRoutes(routes);
@@ -17,10 +18,10 @@ const App = memo(() => {
         {/* 窗体Header */}
         <WindowHeader />
         {/* Main content */}
-        <div className="flex-1 p-4">
+        <Layout.Content className="flex-1 min-h-0 overflow-y-auto p-4">
           <Header className="mb-4" />
           <AppRoutes />
-        </div>
+        </Layout.Content>
       </div>
     </BrowserRouter>
   );

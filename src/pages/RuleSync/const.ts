@@ -9,4 +9,5 @@ export const AI_TOOLS: AITool[] = [
   { key: 'codex', name: 'Codex', logo: codexLogo, targetPath: '~/.codex/AGENTS.md' },
   { key: 'antigravity', name: 'Antigravity', logo: antigravityLogo, targetPath: '~/.gemini/GEMINI.md' },
   { key: 'trae', name: 'Trae', logo: traeLogo, targetPath: '~/.trae/user_rules.md' },
+  { key: 'trae-cn', name: 'TraeCN', logo: traeLogo, targetPath: '~/.trae-cn/user_rules.md' },
 ];
