@@ -1,9 +1,10 @@
+import type { RouteObject } from 'react-router';
 import { lazy } from 'react';
-import { Navigate, type RouteObject } from 'react-router';
+import { Navigate } from 'react-router';
 
-const RuleSync = lazy(() => import('../pages/RuleSync'));
-const McpSync = lazy(() => import('../pages/McpSync'));
-const SkillsSync = lazy(() => import('../pages/SkillsSync'));
+const RuleSync = lazy(async () => import('../pages/RuleSync'));
+const McpSync = lazy(async () => import('../pages/McpSync'));
+const SkillsSync = lazy(async () => import('../pages/SkillsSync'));
 
 export const routes: RouteObject[] = [
   { path: '/', element: <Navigate to="/rule-sync" replace /> },

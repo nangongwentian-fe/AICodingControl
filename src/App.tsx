@@ -1,9 +1,9 @@
 import { memo, Suspense } from 'react';
 import { BrowserRouter, useRoutes } from 'react-router';
-import WindowHeader from './components/WindowHeader';
-import './App.module.scss';
 import Header from './components/Header';
+import WindowHeader from './components/WindowHeader';
 import { routes } from './router/routes';
+import './App.module.scss';
 
 const AppRoutes = memo(() => {
   const element = useRoutes(routes);

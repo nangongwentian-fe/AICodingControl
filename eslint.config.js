@@ -1,62 +1,36 @@
-import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import reactPlugin from 'eslint-plugin-react';
-import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import reactRefreshPlugin from 'eslint-plugin-react-refresh';
-import prettierConfig from 'eslint-config-prettier';
+import antfu from '@antfu/eslint-config';
 
-export default tseslint.config(
+export default antfu({
+  // 启用 React 支持
+  react: true,
+
+  // TypeScript 配置
+  typescript: {
+    tsconfigPath: 'tsconfig.json',
+  },
+
+  // 代码风格配置
+  stylistic: {
+    indent: 2,
+    quotes: 'single',
+    semi: true, // 保留分号（与 Prettier 默认行为一致）
+  },
+
   // 忽略的文件
-  {
-    ignores: [
-      'dist',
-      'dist-electron',
-      'node_modules',
-      '*.config.js',
-      '*.config.ts',
-      'electron/**/*.cjs',
-    ],
+  ignores: [
+    'dist',
+    'dist-electron',
+    'node_modules',
+    'electron/**/*.cjs',
+  ],
+
+  // 自定义规则覆盖
+  rules: {
+    // 允许 console（开发阶段）
+    'no-console': 'off',
+    // 关闭 floating promises 检测
+    'ts/no-floating-promises': 'off',
+    // 关闭严格布尔表达式检测（需要 strictNullChecks）
+    'ts/strict-boolean-expressions': 'off',
   },
-  // 基础配置
-  js.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
-  {
-    languageOptions: {
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
-  // React 配置
-  {
-    files: ['**/*.{ts,tsx}'],
-    plugins: {
-      react: reactPlugin,
-      'react-hooks': reactHooksPlugin,
-      'react-refresh': reactRefreshPlugin,
-    },
-    settings: {
-      react: {
-        version: 'detect',
-      },
-    },
-    rules: {
-      ...reactPlugin.configs.recommended.rules,
-      ...reactPlugin.configs['jsx-runtime'].rules,
-      ...reactHooksPlugin.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
-      // 禁用 display name 检测
-      'react/display-name': 'off',
-      // 禁用 prop-types 检测（TypeScript 已提供类型检查）
-      'react/prop-types': 'off',
-      // 禁用 floating promises 检测
-      '@typescript-eslint/no-floating-promises': 'off',
-    },
-  },
-  // Prettier 配置（禁用与 Prettier 冲突的规则）
-  prettierConfig,
-);
+});

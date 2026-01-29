@@ -1,5 +1,7 @@
-import { memo, useState, useEffect } from 'react';
+import { Card } from 'antd';
+import { memo, useEffect, useState } from 'react';
 import CodeEditor from '@/components/CodeEditor';
+import { AI_TOOLS } from './const';
 
 const AGENTS_FILE = 'AGENTS.md';
 
@@ -20,22 +22,24 @@ const RuleSync = memo(() => {
     loadAgentsFile();
   }, []);
 
-  const handleChange = async (value: string | undefined) => {
+  const handleChange = (value: string | undefined) => {
     const newValue = value ?? '';
     setCode(newValue);
     if (filePath) {
-      await window.electronAPI.writeFile(filePath, newValue);
+      void window.electronAPI.writeFile(filePath, newValue);
     }
   };
 
   return (
     <div className="h-full">
-      <CodeEditor
-        height="400px"
-        language="markdown"
-        value={code}
-        onChange={handleChange}
-      />
+      <CodeEditor height="400px" language="markdown" value={code} onChange={handleChange} />
+      <div className="mt-4 grid grid-cols-4 gap-4">
+        {AI_TOOLS.map(tool => (
+          <Card key={tool.key} title={tool.name} hoverable>
+            {tool.name}
+          </Card>
+        ))}
+      </div>
     </div>
   );
 });

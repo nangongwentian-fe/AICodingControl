@@ -1,8 +1,8 @@
-import { memo } from 'react';
-import { Segmented } from 'antd';
-import { useNavigate, useLocation } from 'react-router';
-import { PAGE_MENU_OPTIONS, DEFAULT_PAGE } from './const';
 import type { PageMenuValue } from './types';
+import { Segmented } from 'antd';
+import { memo } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+import { DEFAULT_PAGE, PAGE_MENU_OPTIONS } from './const';
 
 const PageMenu = memo(() => {
   const navigate = useNavigate();
