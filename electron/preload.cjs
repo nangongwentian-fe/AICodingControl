@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
   writeFile: (filePath, content) => ipcRenderer.invoke('file:write', filePath, content),
   getDataDir: () => ipcRenderer.invoke('app:getDataDir'),
+  getHomeDir: () => ipcRenderer.invoke('app:getHomeDir'),
 });

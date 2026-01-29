@@ -12,4 +12,5 @@ interface ElectronAPI {
   readFile: (filePath: string) => Promise<FileResult>;
   writeFile: (filePath: string, content: string) => Promise<FileResult>;
   getDataDir: () => Promise<string>;
+  getHomeDir: () => Promise<string>;
 }

@@ -47,6 +47,11 @@ function setupIpcHandlers() {
   ipcMain.handle('app:getDataDir', () => {
     return APP_DATA_DIR;
   });
+
+  // 获取用户 home 目录路径
+  ipcMain.handle('app:getHomeDir', () => {
+    return os.homedir();
+  });
 }
 
 function createWindow() {
