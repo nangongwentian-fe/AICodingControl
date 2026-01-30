@@ -119,7 +119,7 @@ export type ClaudeCodeMcpConfig = Record<string, ClaudeCodeServerConfig>;
 
 // ============ 支持的工具类型 ============
 
-export type AiTool = 'trae' | 'traecn' | 'cursor' | 'opencode' | 'codex' | 'claudecode';
+export type AiTool = 'trae' | 'traecn' | 'cursor' | 'opencode' | 'codex' | 'claudecode' | 'antigravity';
 
 // ============ MCP 与工具的关联状态 ============
 

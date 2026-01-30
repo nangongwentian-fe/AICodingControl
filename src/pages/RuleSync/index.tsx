@@ -1,8 +1,8 @@
-import type { AITool } from './types';
-import { Button, Card, message, Modal, Popconfirm, Space } from 'antd';
+import type { AiToolWithLogo } from '@/hooks/useAiTools';
+import { Button, Card, message, Modal, Popconfirm, Space, Spin } from 'antd';
 import { memo, useEffect, useState } from 'react';
 import CodeEditor from '@/components/CodeEditor';
-import { AI_TOOLS } from './const';
+import { useAiTools } from '@/hooks/useAiTools';
 
 const AGENTS_FILE = 'AGENTS.md';
 
@@ -10,8 +10,10 @@ const RuleSync = memo(() => {
   const [code, setCode] = useState('');
   const [filePath, setFilePath] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [viewingTool, setViewingTool] = useState<AITool | null>(null);
+  const [viewingTool, setViewingTool] = useState<AiToolWithLogo | null>(null);
   const [viewingContent, setViewingContent] = useState('');
+
+  const { ruleTools, loading: toolsLoading } = useAiTools();
 
   useEffect(() => {
     const loadAgentsFile = async () => {
@@ -23,32 +25,34 @@ const RuleSync = memo(() => {
         setCode(result.content ?? '');
       }
     };
-    loadAgentsFile();
+    void loadAgentsFile();
   }, []);
 
   const handleChange = (value: string | undefined) => {
     const newValue = value ?? '';
     setCode(newValue);
     if (filePath) {
-      window.electronAPI.writeFile(filePath, newValue);
+      void window.electronAPI.writeFile(filePath, newValue);
     }
   };
 
-  const handleSync = async (targetPath: string, toolName: string) => {
+  const handleSync = async (tool: AiToolWithLogo) => {
+    if (!tool.ruleTargetPath) return;
     const homeDir = await window.electronAPI.getHomeDir();
-    const fullPath = targetPath.replace('~', homeDir);
+    const fullPath = tool.ruleTargetPath.replace('~', homeDir);
     const result = await window.electronAPI.writeFile(fullPath, code);
     if (result.success) {
-      message.success(`已同步到 ${toolName}`);
+      message.success(`已同步到 ${tool.name}`);
     }
     else {
       message.error(`同步失败: ${result.error}`);
     }
   };
 
-  const handleView = async (tool: AITool) => {
+  const handleView = async (tool: AiToolWithLogo) => {
+    if (!tool.ruleTargetPath) return;
     const homeDir = await window.electronAPI.getHomeDir();
-    const fullPath = tool.targetPath.replace('~', homeDir);
+    const fullPath = tool.ruleTargetPath.replace('~', homeDir);
     const result = await window.electronAPI.readFile(fullPath);
     setViewingTool(tool);
     setViewingContent(result.success ? (result.content ?? '') : '');
@@ -58,23 +62,33 @@ const RuleSync = memo(() => {
   const handleViewingContentChange = async (value: string | undefined) => {
     const newValue = value ?? '';
     setViewingContent(newValue);
-    if (viewingTool) {
+    if (viewingTool?.ruleTargetPath) {
       const homeDir = await window.electronAPI.getHomeDir();
-      const fullPath = viewingTool.targetPath.replace('~', homeDir);
-      window.electronAPI.writeFile(fullPath, newValue);
+      const fullPath = viewingTool.ruleTargetPath.replace('~', homeDir);
+      void window.electronAPI.writeFile(fullPath, newValue);
     }
   };
+
+  if (toolsLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Spin tip="加载中...">
+          <div className="p-12" />
+        </Spin>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full">
       <CodeEditor height="400px" language="markdown" value={code} onChange={handleChange} />
       <div className="mt-4 grid grid-cols-4 gap-4">
-        {AI_TOOLS.map(tool => (
+        {ruleTools.map(tool => (
           <Card
-            key={tool.key}
+            key={tool.id}
             title={(
               <Space>
-                <img src={tool.logo} alt={tool.name} className="h-6 w-6 object-contain" />
+                {tool.logoSrc && <img src={tool.logoSrc} alt={tool.name} className="h-6 w-6 object-contain" />}
                 <span>{tool.name}</span>
               </Space>
             )}
@@ -84,7 +98,7 @@ const RuleSync = memo(() => {
               <Popconfirm
                 title="确认同步"
                 description={`确定要同步到 ${tool.name} 吗？`}
-                onConfirm={() => void handleSync(tool.targetPath, tool.name)}
+                onConfirm={() => void handleSync(tool)}
                 okText="确定"
                 cancelText="取消"
               >

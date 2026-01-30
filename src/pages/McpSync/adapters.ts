@@ -203,6 +203,7 @@ type ToolConfigMap = {
   opencode: OpenCodeServerConfig;
   codex: CodexServerConfig;
   claudecode: ClaudeCodeServerConfig;
+  antigravity: TraeCursorServerConfig;
 };
 
 /**
@@ -216,6 +217,7 @@ export function toToolConfig<T extends AiTool>(
     case 'trae':
     case 'traecn':
     case 'cursor':
+    case 'antigravity':
       return toTraeCursorConfig(config) as ToolConfigMap[T];
     case 'opencode':
       return toOpenCodeConfig(config) as ToolConfigMap[T];
@@ -239,6 +241,7 @@ export function fromToolConfig<T extends AiTool>(
     case 'trae':
     case 'traecn':
     case 'cursor':
+    case 'antigravity':
       return fromTraeCursorConfig(config as TraeCursorServerConfig);
     case 'opencode':
       return fromOpenCodeConfig(config as OpenCodeServerConfig);

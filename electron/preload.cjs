@@ -10,4 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeFile: (filePath, content) => ipcRenderer.invoke('file:write', filePath, content),
   getDataDir: () => ipcRenderer.invoke('app:getDataDir'),
   getHomeDir: () => ipcRenderer.invoke('app:getHomeDir'),
+  // AI 工具配置
+  getAiTools: () => ipcRenderer.invoke('app:getAiTools'),
+  saveAiTools: (config) => ipcRenderer.invoke('app:saveAiTools', config),
 });

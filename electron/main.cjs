@@ -5,6 +5,82 @@ const os = require('os');
 
 // 应用数据目录
 const APP_DATA_DIR = path.join(os.homedir(), '.ai-coding-control');
+const AI_TOOLS_FILE = path.join(APP_DATA_DIR, 'ai_coding_tools.json');
+
+// 默认的 AI 工具配置
+const DEFAULT_AI_TOOLS = {
+  tools: [
+    {
+      id: 'trae',
+      name: 'Trae',
+      ruleTargetPath: '~/.trae/user_rules.md',
+      mcpConfigPath: '~/.trae/mcp.json',
+      mcpConfigKey: 'mcpServers',
+      mcpFormat: 'json',
+    },
+    {
+      id: 'traecn',
+      name: 'TraeCN',
+      ruleTargetPath: '~/.trae-cn/user_rules.md',
+      mcpConfigPath: '~/.trae-cn/mcp.json',
+      mcpConfigKey: 'mcpServers',
+      mcpFormat: 'json',
+    },
+    {
+      id: 'cursor',
+      name: 'Cursor',
+      ruleTargetPath: null,
+      mcpConfigPath: '~/.cursor/mcp.json',
+      mcpConfigKey: 'mcpServers',
+      mcpFormat: 'json',
+    },
+    {
+      id: 'opencode',
+      name: 'Open Code',
+      ruleTargetPath: '~/.opencode/AGENTS.md',
+      mcpConfigPath: '~/.opencode/config.json',
+      mcpConfigKey: 'mcp',
+      mcpFormat: 'json',
+    },
+    {
+      id: 'codex',
+      name: 'Codex',
+      ruleTargetPath: '~/.codex/AGENTS.md',
+      mcpConfigPath: '~/.codex/config.toml',
+      mcpConfigKey: 'mcp_servers',
+      mcpFormat: 'toml',
+    },
+    {
+      id: 'claudecode',
+      name: 'Claude Code',
+      ruleTargetPath: '~/.claude/CLAUDE.md',
+      mcpConfigPath: '~/.claude.json',
+      mcpConfigKey: 'mcpServers',
+      mcpFormat: 'json',
+    },
+    {
+      id: 'antigravity',
+      name: 'Antigravity',
+      ruleTargetPath: '~/.gemini/GEMINI.md',
+      mcpConfigPath: '~/.gemini/antigravity/mcp_config.json',
+      mcpConfigKey: 'mcpServers',
+      mcpFormat: 'json',
+    },
+  ],
+};
+
+// 初始化 AI 工具配置文件
+function initAiToolsConfig() {
+  // 确保目录存在
+  if (!fs.existsSync(APP_DATA_DIR)) {
+    fs.mkdirSync(APP_DATA_DIR, { recursive: true });
+  }
+
+  // 如果配置文件不存在，创建默认配置
+  if (!fs.existsSync(AI_TOOLS_FILE)) {
+    fs.writeFileSync(AI_TOOLS_FILE, JSON.stringify(DEFAULT_AI_TOOLS, null, 2), 'utf-8');
+  }
+}
 
 const isDev = !app.isPackaged;
 
@@ -51,6 +127,26 @@ function setupIpcHandlers() {
   // 获取用户 home 目录路径
   ipcMain.handle('app:getHomeDir', () => {
     return os.homedir();
+  });
+
+  // 获取 AI 工具配置
+  ipcMain.handle('app:getAiTools', async () => {
+    try {
+      const content = fs.readFileSync(AI_TOOLS_FILE, 'utf-8');
+      return { success: true, data: JSON.parse(content) };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 保存 AI 工具配置
+  ipcMain.handle('app:saveAiTools', async (_, config) => {
+    try {
+      fs.writeFileSync(AI_TOOLS_FILE, JSON.stringify(config, null, 2), 'utf-8');
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   });
 }
 
@@ -99,6 +195,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  initAiToolsConfig();
   setupIpcHandlers();
   createWindow();
 });
