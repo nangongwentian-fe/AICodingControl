@@ -22,7 +22,8 @@
     "monaco-editor": "^0.55.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router": "^7.13.0"
+    "react-router": "^7.13.0",
+    "smol-toml": "^1.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
