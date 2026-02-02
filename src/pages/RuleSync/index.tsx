@@ -80,7 +80,7 @@ const RuleSync = memo(() => {
   }
 
   return (
-    <div className="h-full">
+    <div>
       <CodeEditor height="400px" language="markdown" value={code} onChange={handleChange} />
       <div className="mt-4 grid grid-cols-4 gap-4">
         {ruleTools.map(tool => (

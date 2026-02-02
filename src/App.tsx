@@ -15,12 +15,18 @@ const App = memo(() => {
   return (
     <BrowserRouter>
       <div className="flex h-screen flex-col bg-gray-50">
-        {/* 窗体Header */}
-        <WindowHeader />
+        {/* 窗体Header - 防止被内容挤压 */}
+        <div className="shrink-0">
+          <WindowHeader />
+        </div>
         {/* Main content */}
-        <Layout.Content className="flex-1 min-h-0 overflow-y-auto p-4">
-          <Header className="mb-4" />
-          <AppRoutes />
+        <Layout.Content className="flex-1 min-h-0 flex flex-col p-4">
+          {/* Header 固定不滚动 */}
+          <Header className="mb-4 shrink-0" />
+          {/* 内容区域可滚动 */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <AppRoutes />
+          </div>
         </Layout.Content>
       </div>
     </BrowserRouter>

@@ -316,7 +316,7 @@ const McpSync = memo(() => {
   const isLoading = toolsLoading || loading;
 
   return (
-    <div className="h-full">
+    <div>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-medium">MCP 列表</h2>
         <div className="flex gap-2">
