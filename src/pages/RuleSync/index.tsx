@@ -1,5 +1,5 @@
 import type { AiToolWithLogo } from '@/hooks/useAiTools';
-import { Button, Card, message, Modal, Popconfirm, Space, Spin } from 'antd';
+import { Avatar, Button, Card, message, Modal, Popconfirm, Space, Spin } from 'antd';
 import { memo, useEffect, useState } from 'react';
 import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
@@ -88,7 +88,7 @@ const RuleSync = memo(() => {
             key={tool.id}
             title={(
               <Space>
-                {tool.logoSrc && <img src={tool.logoSrc} alt={tool.name} className="h-6 w-6 object-contain" />}
+                {tool.logoSrc && <Avatar src={tool.logoSrc} size="small" shape="square" />}
                 <span>{tool.name}</span>
               </Space>
             )}

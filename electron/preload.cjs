@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
   writeFile: (filePath, content) => ipcRenderer.invoke('file:write', filePath, content),
   readDir: (dirPath) => ipcRenderer.invoke('dir:read', dirPath),
+  readDirFiles: (dirPath) => ipcRenderer.invoke('dir:readFiles', dirPath),
   pathExists: (targetPath) => ipcRenderer.invoke('path:exists', targetPath),
   copyDir: (sourcePath, targetPath) => ipcRenderer.invoke('dir:copy', sourcePath, targetPath),
   removeDir: (targetPath) => ipcRenderer.invoke('dir:remove', targetPath),

@@ -3,7 +3,10 @@ import type { SkillItem, SkillTool, SkillToolStatus, SyncRequest } from './types
 import { Button, Empty, message, Modal, Select, Spin } from 'antd';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ReloadOutlined } from '@ant-design/icons';
-import * as lodash from 'lodash';
+import compact from 'lodash/compact';
+import keyBy from 'lodash/keyBy';
+import some from 'lodash/some';
+import sortBy from 'lodash/sortBy';
 import { useAiTools } from '@/hooks/useAiTools';
 import SkillCard from './SkillCard';
 import { SKILL_DEFINITION_FILE, SKILL_TOOL_PATHS } from './const';
@@ -37,7 +40,7 @@ function SkillsSync(): JSX.Element {
       }));
   }, [tools]);
 
-  const skillsByName = useMemo(() => lodash.keyBy(skills, (skill) => skill.name), [skills]);
+  const skillsByName = useMemo(() => keyBy(skills, (skill) => skill.name), [skills]);
 
   const createEmptyToolStatus = useCallback((): SkillToolStatus => {
     const toolIds = Object.keys(SKILL_TOOL_PATHS) as AiToolId[];
@@ -64,7 +67,7 @@ function SkillsSync(): JSX.Element {
         return entry;
       }),
     );
-    return lodash.compact(checks);
+    return compact(checks);
   }, []);
 
   const loadAllSkills = useCallback(async (): Promise<void> => {
@@ -113,7 +116,7 @@ function SkillsSync(): JSX.Element {
       }
     }
 
-    const mergedSkills = lodash.sortBy(Array.from(skillMap.values()), (skill) => skill.name.toLowerCase());
+    const mergedSkills = sortBy(Array.from(skillMap.values()), (skill) => skill.name.toLowerCase());
     setSkills(mergedSkills);
     setLoading(false);
   }, [createEmptyToolStatus, expandPath, filterSkillFolders, skillTools]);
@@ -126,7 +129,7 @@ function SkillsSync(): JSX.Element {
         if (!enabled) return prev;
         const toolStatus = createEmptyToolStatus();
         toolStatus[toolId] = true;
-        return lodash.sortBy([...prev, { name: skillName, toolStatus }], (skill) => skill.name.toLowerCase());
+        return sortBy([...prev, { name: skillName, toolStatus }], (skill) => skill.name.toLowerCase());
       }
 
       const updated = prev.map((skill) => {
@@ -137,8 +140,8 @@ function SkillsSync(): JSX.Element {
         };
       });
 
-      const filtered = updated.filter((skill) => lodash.some(skill.toolStatus));
-      return lodash.sortBy(filtered, (skill) => skill.name.toLowerCase());
+      const filtered = updated.filter((skill) => some(skill.toolStatus));
+      return sortBy(filtered, (skill) => skill.name.toLowerCase());
     });
   }, [createEmptyToolStatus]);
 

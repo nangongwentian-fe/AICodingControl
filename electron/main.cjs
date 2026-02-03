@@ -139,6 +139,22 @@ function setupIpcHandlers() {
     }
   });
 
+  // 读取目录（仅返回文件名称）
+  ipcMain.handle('dir:readFiles', async (event, dirPath) => {
+    try {
+      if (!fs.existsSync(dirPath)) {
+        return { success: true, exists: false, entries: [] };
+      }
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      const files = entries
+        .filter((entry) => entry.isFile() || entry.isSymbolicLink())
+        .map((entry) => entry.name);
+      return { success: true, exists: true, entries: files };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   // 判断路径是否存在
   ipcMain.handle('path:exists', async (event, targetPath) => {
     try {
