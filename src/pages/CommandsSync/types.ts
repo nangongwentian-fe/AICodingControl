@@ -5,7 +5,7 @@ export interface CommandTool extends AiToolWithLogo {
   commandsPath: string;
 }
 
-export type CommandToolStatus = Record<AiToolId, boolean>;
+export type CommandToolStatus = Partial<Record<AiToolId, boolean>>;
 
 export interface CommandItem {
   name: string;

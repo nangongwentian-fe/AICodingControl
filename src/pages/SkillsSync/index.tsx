@@ -9,7 +9,7 @@ import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
 import { useAiTools } from '@/hooks/useAiTools';
 import SkillCard from './SkillCard';
-import { SKILL_DEFINITION_FILE, SKILL_TOOL_PATHS } from './const';
+import { SKILL_DEFINITION_FILE } from './const';
 
 function joinPath(...parts: string[]): string {
   const normalized = parts
@@ -33,22 +33,22 @@ function SkillsSync(): JSX.Element {
 
   const skillTools = useMemo<SkillTool[]>(() => {
     return tools
-      .filter((tool) => Boolean(SKILL_TOOL_PATHS[tool.id as AiToolId]))
+      .filter((tool): tool is SkillTool => Boolean(tool.skillsPath))
       .map((tool) => ({
         ...tool,
-        skillsPath: SKILL_TOOL_PATHS[tool.id as AiToolId],
+        skillsPath: tool.skillsPath,
       }));
   }, [tools]);
 
   const skillsByName = useMemo(() => keyBy(skills, (skill) => skill.name), [skills]);
 
   const createEmptyToolStatus = useCallback((): SkillToolStatus => {
-    const toolIds = Object.keys(SKILL_TOOL_PATHS) as AiToolId[];
-    return toolIds.reduce((acc, toolId) => {
+    return skillTools.reduce((acc, tool) => {
+      const toolId = tool.id as AiToolId;
       acc[toolId] = false;
       return acc;
     }, {} as SkillToolStatus);
-  }, []);
+  }, [skillTools]);
 
   const expandPath = useCallback(async (path: string): Promise<string> => {
     if (path.startsWith('~/')) {

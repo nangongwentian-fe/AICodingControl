@@ -24,7 +24,7 @@ function SkillCard({ skill, tools, onToggleTool }: SkillCardProps): JSX.Element 
             </div>
             <Switch
               size="small"
-              checked={skill.toolStatus[tool.id as AiToolId]}
+              checked={Boolean(skill.toolStatus[tool.id as AiToolId])}
               onChange={(checked) => onToggleTool(skill.name, tool.id as AiToolId, checked)}
             />
           </div>

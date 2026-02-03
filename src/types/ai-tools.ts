@@ -10,6 +10,10 @@ export interface AiToolConfig {
   name: string;
   /** Rule 文件路径，null 表示不支持 Rule 同步 */
   ruleTargetPath: string | null;
+  /** Commands 目录路径，null 表示不支持 Commands 同步 */
+  commandsPath: string | null;
+  /** Skills 目录路径，null 表示不支持 Skills 同步 */
+  skillsPath: string | null;
   /** MCP 配置文件路径，null 表示不支持 MCP 同步 */
   mcpConfigPath: string | null;
   /** MCP 配置的 key */

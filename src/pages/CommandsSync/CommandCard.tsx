@@ -24,7 +24,7 @@ function CommandCard({ command, tools, onToggleTool }: CommandCardProps): JSX.El
             </div>
             <Switch
               size="small"
-              checked={command.toolStatus[tool.id as AiToolId]}
+              checked={Boolean(command.toolStatus[tool.id as AiToolId])}
               onChange={(checked) => onToggleTool(command.name, tool.id as AiToolId, checked)}
             />
           </div>

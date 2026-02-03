@@ -5,7 +5,7 @@ export interface SkillTool extends AiToolWithLogo {
   skillsPath: string;
 }
 
-export type SkillToolStatus = Record<AiToolId, boolean>;
+export type SkillToolStatus = Partial<Record<AiToolId, boolean>>;
 
 export interface SkillItem {
   name: string;

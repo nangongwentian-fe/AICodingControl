@@ -18,6 +18,8 @@ const DEFAULT_AI_TOOLS = {
       id: 'trae',
       name: 'Trae',
       ruleTargetPath: '~/.trae/user_rules.md',
+      commandsPath: '~/.trae/commands',
+      skillsPath: '~/.trae/skills',
       mcpConfigPath: '~/.trae/mcp.json',
       mcpConfigKey: 'mcpServers',
       mcpFormat: 'json',
@@ -26,6 +28,8 @@ const DEFAULT_AI_TOOLS = {
       id: 'traecn',
       name: 'TraeCN',
       ruleTargetPath: '~/.trae-cn/user_rules.md',
+      commandsPath: '~/.trae-cn/commands',
+      skillsPath: '~/.trae-cn/skills',
       mcpConfigPath: '~/.trae-cn/mcp.json',
       mcpConfigKey: 'mcpServers',
       mcpFormat: 'json',
@@ -34,6 +38,8 @@ const DEFAULT_AI_TOOLS = {
       id: 'cursor',
       name: 'Cursor',
       ruleTargetPath: null,
+      commandsPath: '~/.cursor/commands',
+      skillsPath: '~/.cursor/skills',
       mcpConfigPath: '~/.cursor/mcp.json',
       mcpConfigKey: 'mcpServers',
       mcpFormat: 'json',
@@ -42,6 +48,8 @@ const DEFAULT_AI_TOOLS = {
       id: 'opencode',
       name: 'Open Code',
       ruleTargetPath: '~/.opencode/AGENTS.md',
+      commandsPath: '~/.config/opencode/commands',
+      skillsPath: '~/.config/opencode/skill',
       mcpConfigPath: '~/.opencode/config.json',
       mcpConfigKey: 'mcp',
       mcpFormat: 'json',
@@ -50,6 +58,8 @@ const DEFAULT_AI_TOOLS = {
       id: 'codex',
       name: 'Codex',
       ruleTargetPath: '~/.codex/AGENTS.md',
+      commandsPath: '~/.codex/prompts',
+      skillsPath: '~/.codex/skills',
       mcpConfigPath: '~/.codex/config.toml',
       mcpConfigKey: 'mcp_servers',
       mcpFormat: 'toml',
@@ -58,6 +68,8 @@ const DEFAULT_AI_TOOLS = {
       id: 'claudecode',
       name: 'Claude Code',
       ruleTargetPath: '~/.claude/CLAUDE.md',
+      commandsPath: '~/.claude/commands',
+      skillsPath: '~/.claude/skills',
       mcpConfigPath: '~/.claude.json',
       mcpConfigKey: 'mcpServers',
       mcpFormat: 'json',
@@ -66,12 +78,48 @@ const DEFAULT_AI_TOOLS = {
       id: 'antigravity',
       name: 'Antigravity',
       ruleTargetPath: '~/.gemini/GEMINI.md',
+      commandsPath: '~/.gemini/antigravity/global_workflows',
+      skillsPath: '~/.gemini/antigravity/skills',
       mcpConfigPath: '~/.gemini/antigravity/mcp_config.json',
       mcpConfigKey: 'mcpServers',
       mcpFormat: 'json',
     },
   ],
 };
+
+const DEFAULT_AI_TOOLS_BY_ID = DEFAULT_AI_TOOLS.tools.reduce((acc, tool) => {
+  acc[tool.id] = tool;
+  return acc;
+}, {});
+
+const AI_TOOL_OPTIONAL_KEYS = [
+  'ruleTargetPath',
+  'commandsPath',
+  'skillsPath',
+  'mcpConfigPath',
+  'mcpConfigKey',
+  'mcpFormat',
+];
+
+function normalizeAiToolsConfig(rawConfig) {
+  if (!rawConfig || !Array.isArray(rawConfig.tools)) {
+    return { config: DEFAULT_AI_TOOLS, changed: true };
+  }
+
+  let changed = false;
+  const normalizedTools = rawConfig.tools.map((tool) => {
+    const defaultTool = DEFAULT_AI_TOOLS_BY_ID[tool.id];
+    const nextTool = { ...tool };
+    for (const key of AI_TOOL_OPTIONAL_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(nextTool, key)) continue;
+      nextTool[key] = defaultTool ? defaultTool[key] ?? null : null;
+      changed = true;
+    }
+    return nextTool;
+  });
+
+  return { config: { ...rawConfig, tools: normalizedTools }, changed };
+}
 
 // 初始化 AI 工具配置文件
 function initAiToolsConfig() {
@@ -82,6 +130,17 @@ function initAiToolsConfig() {
 
   // 如果配置文件不存在，创建默认配置
   if (!fs.existsSync(AI_TOOLS_FILE)) {
+    fs.writeFileSync(AI_TOOLS_FILE, JSON.stringify(DEFAULT_AI_TOOLS, null, 2), 'utf-8');
+    return;
+  }
+
+  try {
+    const content = fs.readFileSync(AI_TOOLS_FILE, 'utf-8');
+    const { config, changed } = normalizeAiToolsConfig(JSON.parse(content));
+    if (changed) {
+      fs.writeFileSync(AI_TOOLS_FILE, JSON.stringify(config, null, 2), 'utf-8');
+    }
+  } catch (error) {
     fs.writeFileSync(AI_TOOLS_FILE, JSON.stringify(DEFAULT_AI_TOOLS, null, 2), 'utf-8');
   }
 }
@@ -210,7 +269,11 @@ function setupIpcHandlers() {
   ipcMain.handle('app:getAiTools', async () => {
     try {
       const content = fs.readFileSync(AI_TOOLS_FILE, 'utf-8');
-      return { success: true, data: JSON.parse(content) };
+      const { config, changed } = normalizeAiToolsConfig(JSON.parse(content));
+      if (changed) {
+        fs.writeFileSync(AI_TOOLS_FILE, JSON.stringify(config, null, 2), 'utf-8');
+      }
+      return { success: true, data: config };
     } catch (error) {
       return { success: false, error: error.message };
     }

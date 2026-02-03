@@ -9,7 +9,7 @@ import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
 import { useAiTools } from '@/hooks/useAiTools';
 import CommandCard from './CommandCard';
-import { COMMAND_FILE_EXTENSION, COMMAND_TOOL_PATHS } from './const';
+import { COMMAND_FILE_EXTENSION } from './const';
 
 function joinPath(...parts: string[]): string {
   const normalized = parts
@@ -33,22 +33,22 @@ function CommandsSync(): JSX.Element {
 
   const commandTools = useMemo<CommandTool[]>(() => {
     return tools
-      .filter((tool) => Boolean(COMMAND_TOOL_PATHS[tool.id as AiToolId]))
+      .filter((tool): tool is CommandTool => Boolean(tool.commandsPath))
       .map((tool) => ({
         ...tool,
-        commandsPath: COMMAND_TOOL_PATHS[tool.id as AiToolId],
+        commandsPath: tool.commandsPath,
       }));
   }, [tools]);
 
   const commandsByName = useMemo(() => keyBy(commands, (command) => command.name), [commands]);
 
   const createEmptyToolStatus = useCallback((): CommandToolStatus => {
-    const toolIds = Object.keys(COMMAND_TOOL_PATHS) as AiToolId[];
-    return toolIds.reduce((acc, toolId) => {
+    return commandTools.reduce((acc, tool) => {
+      const toolId = tool.id as AiToolId;
       acc[toolId] = false;
       return acc;
     }, {} as CommandToolStatus);
-  }, []);
+  }, [commandTools]);
 
   const expandPath = useCallback(async (path: string): Promise<string> => {
     if (path.startsWith('~/')) {

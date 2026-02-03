@@ -1,5 +1,5 @@
 import { memo, Suspense } from 'react';
-import { BrowserRouter, useRoutes } from 'react-router';
+import { HashRouter, useRoutes } from 'react-router';
 import Header from './components/Header';
 import WindowHeader from './components/WindowHeader';
 import { routes } from './router/routes';
@@ -13,7 +13,7 @@ const AppRoutes = memo(() => {
 
 const App = memo(() => {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="flex h-screen flex-col bg-gray-50">
         {/* 窗体Header - 防止被内容挤压 */}
         <div className="shrink-0">
@@ -29,7 +29,7 @@ const App = memo(() => {
           </div>
         </Layout.Content>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 });
 
