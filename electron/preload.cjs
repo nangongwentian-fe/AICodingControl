@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 文件操作
   readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
   writeFile: (filePath, content) => ipcRenderer.invoke('file:write', filePath, content),
+  readDir: (dirPath) => ipcRenderer.invoke('dir:read', dirPath),
+  pathExists: (targetPath) => ipcRenderer.invoke('path:exists', targetPath),
+  copyDir: (sourcePath, targetPath) => ipcRenderer.invoke('dir:copy', sourcePath, targetPath),
+  removeDir: (targetPath) => ipcRenderer.invoke('dir:remove', targetPath),
   getDataDir: () => ipcRenderer.invoke('app:getDataDir'),
   getHomeDir: () => ipcRenderer.invoke('app:getHomeDir'),
   // AI 工具配置

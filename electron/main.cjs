@@ -3,6 +3,10 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+const APP_NAME = 'AI Coding Control';
+
+app.setName(APP_NAME);
+
 // 应用数据目录
 const APP_DATA_DIR = path.join(os.homedir(), '.ai-coding-control');
 const AI_TOOLS_FILE = path.join(APP_DATA_DIR, 'ai_coding_tools.json');
@@ -119,6 +123,63 @@ function setupIpcHandlers() {
     }
   });
 
+  // 读取目录（仅返回子目录名称）
+  ipcMain.handle('dir:read', async (event, dirPath) => {
+    try {
+      if (!fs.existsSync(dirPath)) {
+        return { success: true, exists: false, entries: [] };
+      }
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      const directories = entries
+        .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+        .map((entry) => entry.name);
+      return { success: true, exists: true, entries: directories };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 判断路径是否存在
+  ipcMain.handle('path:exists', async (event, targetPath) => {
+    try {
+      return { success: true, exists: fs.existsSync(targetPath) };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 复制目录
+  ipcMain.handle('dir:copy', async (event, sourcePath, targetPath) => {
+    try {
+      if (!fs.existsSync(sourcePath)) {
+        return { success: false, error: '源目录不存在' };
+      }
+      const targetParent = path.dirname(targetPath);
+      if (!fs.existsSync(targetParent)) {
+        fs.mkdirSync(targetParent, { recursive: true });
+      }
+      if (fs.existsSync(targetPath)) {
+        fs.rmSync(targetPath, { recursive: true, force: true });
+      }
+      fs.cpSync(sourcePath, targetPath, { recursive: true });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 删除目录
+  ipcMain.handle('dir:remove', async (event, targetPath) => {
+    try {
+      if (fs.existsSync(targetPath)) {
+        fs.rmSync(targetPath, { recursive: true, force: true });
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   // 获取应用数据目录路径
   ipcMain.handle('app:getDataDir', () => {
     return APP_DATA_DIR;
@@ -156,6 +217,7 @@ function createWindow() {
     height: 800,
     frame: false,
     transparent: true,
+    title: APP_NAME,
     titleBarStyle: 'hidden',
     webPreferences: {
       nodeIntegration: false,
