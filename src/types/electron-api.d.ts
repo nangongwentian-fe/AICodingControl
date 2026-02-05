@@ -46,4 +46,5 @@ interface ElectronAPI {
   getHomeDir: () => Promise<string>;
   getAiTools: () => Promise<AiToolsResult>;
   saveAiTools: (config: AiToolsConfig) => Promise<FileResult>;
+  openExternal: (url: string) => Promise<OperationResult>;
 }

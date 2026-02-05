@@ -343,6 +343,12 @@ function SkillsSync(): JSX.Element {
           <Button icon={<ReloadOutlined />} onClick={() => void loadAllSkills()} loading={isLoading}>
             刷新
           </Button>
+          <Button
+            type="primary"
+            onClick={() => window.electronAPI.openExternal('https://skills.sh/')}
+          >
+            安装Skills
+          </Button>
         </div>
       </div>
 

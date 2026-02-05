@@ -18,4 +18,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AI 工具配置
   getAiTools: () => ipcRenderer.invoke('app:getAiTools'),
   saveAiTools: (config) => ipcRenderer.invoke('app:saveAiTools', config),
+  // 打开外部链接
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 });

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -283,6 +283,16 @@ function setupIpcHandlers() {
   ipcMain.handle('app:saveAiTools', async (_, config) => {
     try {
       fs.writeFileSync(AI_TOOLS_FILE, JSON.stringify(config, null, 2), 'utf-8');
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 打开外部链接
+  ipcMain.handle('shell:openExternal', async (_, url) => {
+    try {
+      await shell.openExternal(url);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
