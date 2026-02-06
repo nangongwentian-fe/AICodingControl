@@ -10,6 +10,11 @@ app.setName(APP_NAME);
 // 应用数据目录
 const APP_DATA_DIR = path.join(os.homedir(), '.ai-coding-control');
 const AI_TOOLS_FILE = path.join(APP_DATA_DIR, 'ai_coding_tools.json');
+const APPDATA_DIR = app.getPath('appData');
+
+function getTraeMcpConfigPath(folderName) {
+  return path.join(APPDATA_DIR, folderName, 'User', 'mcp.json');
+}
 
 // 默认的 AI 工具配置
 const DEFAULT_AI_TOOLS = {
@@ -20,7 +25,7 @@ const DEFAULT_AI_TOOLS = {
       ruleTargetPath: '~/.trae/user_rules.md',
       commandsPath: '~/.trae/commands',
       skillsPath: '~/.trae/skills',
-      mcpConfigPath: '~/.trae/mcp.json',
+      mcpConfigPath: getTraeMcpConfigPath('Trae'),
       mcpConfigKey: 'mcpServers',
       mcpFormat: 'json',
     },
@@ -30,7 +35,7 @@ const DEFAULT_AI_TOOLS = {
       ruleTargetPath: '~/.trae-cn/user_rules.md',
       commandsPath: '~/.trae-cn/commands',
       skillsPath: '~/.trae-cn/skills',
-      mcpConfigPath: '~/.trae-cn/mcp.json',
+      mcpConfigPath: getTraeMcpConfigPath('Trae CN'),
       mcpConfigKey: 'mcpServers',
       mcpFormat: 'json',
     },
