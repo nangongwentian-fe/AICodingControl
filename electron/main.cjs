@@ -112,9 +112,14 @@ function normalizeAiToolsConfig(rawConfig) {
   }
 
   let changed = false;
+  const existingToolIds = new Set();
+
+  // 规范化已有工具，填充缺失的字段
   const normalizedTools = rawConfig.tools.map((tool) => {
     const defaultTool = DEFAULT_AI_TOOLS_BY_ID[tool.id];
     const nextTool = { ...tool };
+    existingToolIds.add(tool.id);
+
     for (const key of AI_TOOL_OPTIONAL_KEYS) {
       if (Object.prototype.hasOwnProperty.call(nextTool, key)) continue;
       nextTool[key] = defaultTool ? defaultTool[key] ?? null : null;
@@ -122,6 +127,14 @@ function normalizeAiToolsConfig(rawConfig) {
     }
     return nextTool;
   });
+
+  // 添加 DEFAULT_AI_TOOLS 中新增的工具
+  for (const defaultTool of DEFAULT_AI_TOOLS.tools) {
+    if (!existingToolIds.has(defaultTool.id)) {
+      normalizedTools.push({ ...defaultTool });
+      changed = true;
+    }
+  }
 
   return { config: { ...rawConfig, tools: normalizedTools }, changed };
 }
