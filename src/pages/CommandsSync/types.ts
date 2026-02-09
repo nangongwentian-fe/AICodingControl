@@ -16,3 +16,8 @@ export interface SyncRequest {
   commandName: string;
   targetToolId: AiToolId;
 }
+
+export interface EditRequest {
+  commandName: string;
+  toolId: AiToolId;
+}

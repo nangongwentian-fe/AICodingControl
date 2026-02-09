@@ -1,5 +1,5 @@
 import type { AiToolId } from '@/types/ai-tools';
-import type { CommandItem, CommandTool, CommandToolStatus, SyncRequest } from './types';
+import type { CommandItem, CommandTool, CommandToolStatus, EditRequest, SyncRequest } from './types';
 import { Button, Empty, message, Modal, Select, Spin } from 'antd';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ReloadOutlined } from '@ant-design/icons';
@@ -7,9 +7,10 @@ import filter from 'lodash/filter';
 import keyBy from 'lodash/keyBy';
 import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
+import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
 import CommandCard from './CommandCard';
-import { COMMAND_FILE_EXTENSION } from './const';
+import { COMMAND_EDITOR_HEIGHT, COMMAND_FILE_EXTENSION } from './const';
 
 function joinPath(...parts: string[]): string {
   const normalized = parts
@@ -28,6 +29,11 @@ function CommandsSync(): JSX.Element {
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [syncSourceToolId, setSyncSourceToolId] = useState<AiToolId | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [editRequest, setEditRequest] = useState<EditRequest | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editContent, setEditContent] = useState('');
 
   const { tools, loading: toolsLoading } = useAiTools();
 
@@ -142,6 +148,19 @@ function CommandsSync(): JSX.Element {
     if (!command) return [];
     return commandTools.filter((tool) => tool.id !== targetToolId && command.toolStatus[tool.id as AiToolId]);
   }, [commandTools, commandsByName]);
+
+  const getEnabledTools = useCallback((commandName: string): CommandTool[] => {
+    const command = commandsByName[commandName];
+    if (!command) return [];
+    return commandTools.filter((tool) => command.toolStatus[tool.id as AiToolId]);
+  }, [commandTools, commandsByName]);
+
+  const getCommandFilePath = useCallback(async (commandName: string, toolId: AiToolId): Promise<string | null> => {
+    const tool = commandTools.find((item) => item.id === toolId);
+    if (!tool) return null;
+    const commandRoot = await expandPath(tool.commandsPath);
+    return joinPath(commandRoot, commandName);
+  }, [commandTools, expandPath]);
 
   const syncCommandBetweenTools = useCallback(async (
     commandName: string,
@@ -278,11 +297,105 @@ function CommandsSync(): JSX.Element {
     setSyncSourceToolId(null);
   }, []);
 
+  const handleOpenEdit = useCallback((commandName: string): void => {
+    const enabledTools = getEnabledTools(commandName);
+    if (enabledTools.length === 0) {
+      message.error('未找到可编辑的 Command 文件');
+      return;
+    }
+
+    setEditContent('');
+    setEditLoading(false);
+    setEditSaving(false);
+    setEditRequest({
+      commandName,
+      toolId: enabledTools[0].id as AiToolId,
+    });
+    setEditModalOpen(true);
+  }, [getEnabledTools]);
+
+  const handleEditCancel = useCallback((): void => {
+    setEditModalOpen(false);
+    setEditRequest(null);
+    setEditLoading(false);
+    setEditSaving(false);
+    setEditContent('');
+  }, []);
+
+  const handleEditToolChange = useCallback((toolId: AiToolId): void => {
+    setEditRequest((prev) => (prev ? { ...prev, toolId } : prev));
+  }, []);
+
+  const handleSaveEditedCommand = useCallback(async (): Promise<void> => {
+    if (!editRequest) return;
+
+    const filePath = await getCommandFilePath(editRequest.commandName, editRequest.toolId);
+    if (!filePath) {
+      message.error('未找到对应的 Command 文件');
+      return;
+    }
+
+    setEditSaving(true);
+    const result = await window.electronAPI.writeFile(filePath, editContent);
+    setEditSaving(false);
+
+    if (!result.success) {
+      message.error(`保存失败: ${result.error ?? '未知错误'}`);
+      return;
+    }
+
+    message.success('保存成功');
+  }, [editContent, editRequest, getCommandFilePath]);
+
   const sourceOptions = useMemo(() => {
     if (!syncRequest) return [];
     const sources = getSourceTools(syncRequest.commandName, syncRequest.targetToolId);
     return sources.map((tool) => ({ label: tool.name, value: tool.id }));
   }, [getSourceTools, syncRequest]);
+
+  const editToolOptions = useMemo(() => {
+    if (!editRequest) return [];
+    const enabledTools = getEnabledTools(editRequest.commandName);
+    return enabledTools.map((tool) => ({ label: tool.name, value: tool.id as AiToolId }));
+  }, [editRequest, getEnabledTools]);
+
+  useEffect(() => {
+    if (!editModalOpen || !editRequest) return;
+
+    let cancelled = false;
+
+    const loadContent = async (): Promise<void> => {
+      setEditLoading(true);
+
+      const filePath = await getCommandFilePath(editRequest.commandName, editRequest.toolId);
+      if (!filePath) {
+        if (!cancelled) {
+          setEditLoading(false);
+          setEditContent('');
+          message.error('未找到对应的 Command 文件');
+        }
+        return;
+      }
+
+      const result = await window.electronAPI.readFile(filePath);
+      if (cancelled) return;
+
+      if (!result.success) {
+        setEditContent('');
+        message.error(`读取失败: ${result.error ?? '未知错误'}`);
+      } else {
+        setEditContent(result.content ?? '');
+      }
+
+      setEditLoading(false);
+    };
+
+    void loadContent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editModalOpen, editRequest, getCommandFilePath]);
 
   useEffect(() => {
     if (toolsLoading) return;
@@ -321,6 +434,7 @@ function CommandsSync(): JSX.Element {
             command={command}
             tools={commandTools}
             onToggleTool={handleToggleTool}
+            onEditCommand={handleOpenEdit}
           />
         ))}
       </div>
@@ -364,6 +478,46 @@ function CommandsSync(): JSX.Element {
               value={syncSourceToolId ?? undefined}
               onChange={(value) => setSyncSourceToolId(value as AiToolId)}
             />
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        title={editRequest ? `编辑 ${editRequest.commandName}` : '编辑 Command'}
+        open={editModalOpen}
+        onOk={() => void handleSaveEditedCommand()}
+        onCancel={handleEditCancel}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={editSaving}
+        okButtonProps={{ disabled: editLoading || !editRequest }}
+        width={960}
+        destroyOnHidden
+      >
+        {editRequest ? (
+          <div className="space-y-3">
+            {editToolOptions.length > 1 ? (
+              <Select
+                className="w-full"
+                placeholder="选择要编辑的工具"
+                options={editToolOptions}
+                value={editRequest.toolId}
+                onChange={(value) => handleEditToolChange(value as AiToolId)}
+              />
+            ) : null}
+
+            {editLoading ? (
+              <div className="flex justify-center py-12">
+                <Spin tip="正在加载 Command 内容..." />
+              </div>
+            ) : (
+              <CodeEditor
+                height={COMMAND_EDITOR_HEIGHT}
+                language="markdown"
+                value={editContent}
+                onChange={(value) => setEditContent(value ?? '')}
+              />
+            )}
           </div>
         ) : null}
       </Modal>
