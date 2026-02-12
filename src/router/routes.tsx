@@ -6,6 +6,7 @@ const RuleSync = lazy(async () => import('../pages/RuleSync'));
 const McpSync = lazy(async () => import('../pages/McpSync'));
 const SkillsSync = lazy(async () => import('../pages/SkillsSync'));
 const CommandsSync = lazy(async () => import('../pages/CommandsSync'));
+const ClaudeCode = lazy(async () => import('../pages/ClaudeCode'));
 
 export const routes: RouteObject[] = [
   { path: '/', element: <Navigate to="/rule-sync" replace /> },
@@ -13,4 +14,5 @@ export const routes: RouteObject[] = [
   { path: '/mcp-sync', element: <McpSync /> },
   { path: '/skills-sync', element: <SkillsSync /> },
   { path: '/commands-sync', element: <CommandsSync /> },
+  { path: '/claude-code', element: <ClaudeCode /> },
 ];

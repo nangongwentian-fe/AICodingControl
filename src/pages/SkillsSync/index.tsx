@@ -8,18 +8,9 @@ import keyBy from 'lodash/keyBy';
 import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
 import { useAiTools } from '@/hooks/useAiTools';
+import { expandPath, joinPath } from '@/utils/path';
 import SkillCard from './SkillCard';
 import { SKILL_DEFINITION_FILE } from './const';
-
-function joinPath(...parts: string[]): string {
-  const normalized = parts
-    .filter(Boolean)
-    .map((part, index) => {
-      if (index === 0) return part.replace(/\/$/, '');
-      return part.replace(/^\/+/, '').replace(/\/$/, '');
-    });
-  return normalized.join('/');
-}
 
 function SkillsSync(): JSX.Element {
   const [skills, setSkills] = useState<SkillItem[]>([]);
@@ -50,13 +41,7 @@ function SkillsSync(): JSX.Element {
     }, {} as SkillToolStatus);
   }, [skillTools]);
 
-  const expandPath = useCallback(async (path: string): Promise<string> => {
-    if (path.startsWith('~/')) {
-      const homeDir = await window.electronAPI.getHomeDir();
-      return path.replace('~', homeDir);
-    }
-    return path;
-  }, []);
+
 
   const filterSkillFolders = useCallback(async (rootPath: string, entries: string[]): Promise<string[]> => {
     const checks = await Promise.all(
@@ -119,7 +104,7 @@ function SkillsSync(): JSX.Element {
     const mergedSkills = sortBy(Array.from(skillMap.values()), (skill) => skill.name.toLowerCase());
     setSkills(mergedSkills);
     setLoading(false);
-  }, [createEmptyToolStatus, expandPath, filterSkillFolders, skillTools]);
+  }, [createEmptyToolStatus, filterSkillFolders, skillTools]);
 
   const updateSkillStatus = useCallback((skillName: string, toolId: AiToolId, enabled: boolean): void => {
     setSkills((prev) => {
@@ -182,7 +167,7 @@ function SkillsSync(): JSX.Element {
     }
 
     return true;
-  }, [expandPath, skillTools]);
+  }, [skillTools]);
 
   const removeSkillFromTool = useCallback(async (skillName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = skillTools.find((item) => item.id === toolId);
@@ -201,7 +186,7 @@ function SkillsSync(): JSX.Element {
     }
 
     return true;
-  }, [expandPath, skillTools]);
+  }, [skillTools]);
 
   const handleEnableSkill = useCallback(async (skillName: string, toolId: AiToolId): Promise<void> => {
     const sources = getSourceTools(skillName, toolId);

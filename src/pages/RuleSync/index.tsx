@@ -3,6 +3,7 @@ import { Avatar, Button, Card, message, Modal, Popconfirm, Space, Spin } from 'a
 import { memo, useEffect, useState } from 'react';
 import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
+import { expandPath } from '@/utils/path';
 
 const AGENTS_FILE = 'AGENTS.md';
 
@@ -38,8 +39,7 @@ const RuleSync = memo(() => {
 
   const handleSync = async (tool: AiToolWithLogo) => {
     if (!tool.ruleTargetPath) return;
-    const homeDir = await window.electronAPI.getHomeDir();
-    const fullPath = tool.ruleTargetPath.replace('~', homeDir);
+    const fullPath = await expandPath(tool.ruleTargetPath);
     const result = await window.electronAPI.writeFile(fullPath, code);
     if (result.success) {
       message.success(`已同步到 ${tool.name}`);
@@ -51,8 +51,7 @@ const RuleSync = memo(() => {
 
   const handleView = async (tool: AiToolWithLogo) => {
     if (!tool.ruleTargetPath) return;
-    const homeDir = await window.electronAPI.getHomeDir();
-    const fullPath = tool.ruleTargetPath.replace('~', homeDir);
+    const fullPath = await expandPath(tool.ruleTargetPath);
     const result = await window.electronAPI.readFile(fullPath);
     setViewingTool(tool);
     setViewingContent(result.success ? (result.content ?? '') : '');
@@ -63,8 +62,7 @@ const RuleSync = memo(() => {
     const newValue = value ?? '';
     setViewingContent(newValue);
     if (viewingTool?.ruleTargetPath) {
-      const homeDir = await window.electronAPI.getHomeDir();
-      const fullPath = viewingTool.ruleTargetPath.replace('~', homeDir);
+      const fullPath = await expandPath(viewingTool.ruleTargetPath);
       void window.electronAPI.writeFile(fullPath, newValue);
     }
   };

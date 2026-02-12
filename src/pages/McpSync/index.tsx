@@ -5,6 +5,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import * as TOML from 'smol-toml';
 import { useAiTools } from '@/hooks/useAiTools';
+import { expandPath } from '@/utils/path';
 import { exportToToolFormat, importFromToolFormat, isValidMcpConfigRecord } from './adapters';
 import McpServerCard from './McpServerCard';
 import McpServerModal from './McpServerModal';
@@ -29,14 +30,7 @@ const McpSync = memo(() => {
     }, {} as McpToolStatus);
   }, [mcpTools]);
 
-  // 展开路径中的 ~
-  const expandPath = useCallback(async (path: string): Promise<string> => {
-    if (path.startsWith('~/')) {
-      const homeDir = await window.electronAPI.getHomeDir();
-      return path.replace('~', homeDir);
-    }
-    return path;
-  }, []);
+
 
   // 保存 MCP 列表到本地文件
   const saveMcpServers = useCallback(async (servers: McpServerWithStatus[]) => {
@@ -69,7 +63,7 @@ const McpSync = memo(() => {
     } catch {
       return [];
     }
-  }, [expandPath]);
+  }, []);
 
   // 从所有工具读取并合并 MCP 配置
   const loadAllMcpServers = useCallback(async () => {
@@ -153,7 +147,7 @@ const McpSync = memo(() => {
     }
 
     await window.electronAPI.writeFile(configPath, content);
-  }, [expandPath]);
+  }, []);
 
   // 切换某个 MCP 在某个工具中的配置状态
   const handleToggleTool = useCallback(async (

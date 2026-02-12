@@ -9,18 +9,9 @@ import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
 import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
+import { expandPath, joinPath } from '@/utils/path';
 import CommandCard from './CommandCard';
 import { COMMAND_EDITOR_HEIGHT, COMMAND_FILE_EXTENSION } from './const';
-
-function joinPath(...parts: string[]): string {
-  const normalized = parts
-    .filter(Boolean)
-    .map((part, index) => {
-      if (index === 0) return part.replace(/\/$/, '');
-      return part.replace(/^\/+/, '').replace(/\/$/, '');
-    });
-  return normalized.join('/');
-}
 
 function CommandsSync(): JSX.Element {
   const [commands, setCommands] = useState<CommandItem[]>([]);
@@ -56,13 +47,7 @@ function CommandsSync(): JSX.Element {
     }, {} as CommandToolStatus);
   }, [commandTools]);
 
-  const expandPath = useCallback(async (path: string): Promise<string> => {
-    if (path.startsWith('~/')) {
-      const homeDir = await window.electronAPI.getHomeDir();
-      return path.replace('~', homeDir);
-    }
-    return path;
-  }, []);
+
 
   const filterCommandFiles = useCallback((entries: string[]): string[] => {
     return filter(entries, (entry) => entry.toLowerCase().endsWith(COMMAND_FILE_EXTENSION));
@@ -117,7 +102,7 @@ function CommandsSync(): JSX.Element {
     const mergedCommands = sortBy(Array.from(commandMap.values()), (command) => command.name.toLowerCase());
     setCommands(mergedCommands);
     setLoading(false);
-  }, [commandTools, createEmptyToolStatus, expandPath, filterCommandFiles]);
+  }, [commandTools, createEmptyToolStatus, filterCommandFiles]);
 
   const updateCommandStatus = useCallback((commandName: string, toolId: AiToolId, enabled: boolean): void => {
     setCommands((prev) => {
@@ -160,7 +145,7 @@ function CommandsSync(): JSX.Element {
     if (!tool) return null;
     const commandRoot = await expandPath(tool.commandsPath);
     return joinPath(commandRoot, commandName);
-  }, [commandTools, expandPath]);
+  }, [commandTools]);
 
   const syncCommandBetweenTools = useCallback(async (
     commandName: string,
@@ -193,7 +178,7 @@ function CommandsSync(): JSX.Element {
     }
 
     return true;
-  }, [commandTools, expandPath]);
+  }, [commandTools]);
 
   const removeCommandFromTool = useCallback(async (commandName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = commandTools.find((item) => item.id === toolId);
@@ -212,7 +197,7 @@ function CommandsSync(): JSX.Element {
     }
 
     return true;
-  }, [commandTools, expandPath]);
+  }, [commandTools]);
 
   const handleEnableCommand = useCallback(async (commandName: string, toolId: AiToolId): Promise<void> => {
     const sources = getSourceTools(commandName, toolId);

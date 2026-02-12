@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@iconify/react": "^6.0.2",
     "@monaco-editor/react": "^4.7.0",
     "antd": "^6.2.2",
     "lodash": "^4.17.21",
@@ -29,8 +30,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@tailwindcss/vite": "^4.1.18",
-    "@types/node": "^20.0.0",
     "@types/lodash": "^4.17.12",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
