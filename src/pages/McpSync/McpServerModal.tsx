@@ -117,60 +117,70 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
                   </Form.Item>
 
                   <Form.Item label="参数" required>
-                    <Form.List name="args">
-                      {(fields, { add, remove }) => (
-                        <>
-                          {fields.map((field) => (
-                            <Space key={field.key} align="baseline" className="mb-2 flex">
-                              <Form.Item
-                                {...field}
-                                name={[field.name, 'value']}
-                                rules={[{ required: true, message: '请输入参数' }]}
-                                className="mb-0 flex-1"
-                              >
-                                <Input placeholder="参数值" />
-                              </Form.Item>
-                              <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
-                            </Space>
-                          ))}
-                          <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                            添加参数
-                          </Button>
-                        </>
-                      )}
-                    </Form.List>
+                    {getFieldValue('configType') === 'stdio' && (
+                      <Form.List name="args">
+                        {(fields, { add, remove }) => (
+                          <>
+                            {fields.map((field) => {
+                              const { key: _, ...restField } = field;
+                              return (
+                                <Space key={field.key} align="baseline" className="mb-2 flex">
+                                  <Form.Item
+                                    {...restField}
+                                    name={[field.name, 'value']}
+                                    rules={[{ required: true, message: '请输入参数' }]}
+                                    className="mb-0 flex-1"
+                                  >
+                                    <Input placeholder="参数值" />
+                                  </Form.Item>
+                                  <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
+                                </Space>
+                              );
+                            })}
+                            <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                              添加参数
+                            </Button>
+                          </>
+                        )}
+                      </Form.List>
+                    )}
                   </Form.Item>
 
                   <Form.Item label="环境变量">
-                    <Form.List name="env">
-                      {(fields, { add, remove }) => (
-                        <>
-                          {fields.map((field) => (
-                            <Space key={field.key} align="baseline" className="mb-2 flex">
-                              <Form.Item
-                                {...field}
-                                name={[field.name, 'key']}
-                                className="mb-0"
-                              >
-                                <Input placeholder="变量名" style={{ width: 140 }} />
-                              </Form.Item>
-                              <span>=</span>
-                              <Form.Item
-                                {...field}
-                                name={[field.name, 'value']}
-                                className="mb-0 flex-1"
-                              >
-                                <Input placeholder="变量值" />
-                              </Form.Item>
-                              <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
-                            </Space>
-                          ))}
-                          <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                            添加环境变量
-                          </Button>
-                        </>
-                      )}
-                    </Form.List>
+                    {getFieldValue('configType') === 'stdio' && (
+                      <Form.List name="env">
+                        {(fields, { add, remove }) => (
+                          <>
+                            {fields.map((field) => {
+                              const { key: _, ...restField } = field;
+                              return (
+                                <Space key={field.key} align="baseline" className="mb-2 flex">
+                                  <Form.Item
+                                    {...restField}
+                                    name={[field.name, 'key']}
+                                    className="mb-0"
+                                  >
+                                    <Input placeholder="变量名" style={{ width: 140 }} />
+                                  </Form.Item>
+                                  <span>=</span>
+                                  <Form.Item
+                                    {...restField}
+                                    name={[field.name, 'value']}
+                                    className="mb-0 flex-1"
+                                  >
+                                    <Input placeholder="变量值" />
+                                  </Form.Item>
+                                  <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
+                                </Space>
+                              );
+                            })}
+                            <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                              添加环境变量
+                            </Button>
+                          </>
+                        )}
+                      </Form.List>
+                    )}
                   </Form.Item>
                 </>
               );
@@ -188,35 +198,40 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
                 </Form.Item>
 
                 <Form.Item label="Headers">
-                  <Form.List name="headers">
-                    {(fields, { add, remove }) => (
-                      <>
-                        {fields.map((field) => (
-                          <Space key={field.key} align="baseline" className="mb-2 flex">
-                            <Form.Item
-                              {...field}
-                              name={[field.name, 'key']}
-                              className="mb-0"
-                            >
-                              <Input placeholder="Header 名" style={{ width: 140 }} />
-                            </Form.Item>
-                            <span>=</span>
-                            <Form.Item
-                              {...field}
-                              name={[field.name, 'value']}
-                              className="mb-0 flex-1"
-                            >
-                              <Input placeholder="Header 值" />
-                            </Form.Item>
-                            <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
-                          </Space>
-                        ))}
-                        <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                          添加 Header
-                        </Button>
-                      </>
-                    )}
-                  </Form.List>
+                  {getFieldValue('configType') === 'http' && (
+                    <Form.List name="headers">
+                      {(fields, { add, remove }) => (
+                        <>
+                          {fields.map((field) => {
+                            const { key: _, ...restField } = field;
+                            return (
+                              <Space key={field.key} align="baseline" className="mb-2 flex">
+                                <Form.Item
+                                  {...restField}
+                                  name={[field.name, 'key']}
+                                  className="mb-0"
+                                >
+                                  <Input placeholder="Header 名" style={{ width: 140 }} />
+                                </Form.Item>
+                                <span>=</span>
+                                <Form.Item
+                                  {...restField}
+                                  name={[field.name, 'value']}
+                                  className="mb-0 flex-1"
+                                >
+                                  <Input placeholder="Header 值" />
+                                </Form.Item>
+                                <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
+                              </Space>
+                            );
+                          })}
+                          <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                            添加 Header
+                          </Button>
+                        </>
+                      )}
+                    </Form.List>
+                  )}
                 </Form.Item>
               </>
             );
