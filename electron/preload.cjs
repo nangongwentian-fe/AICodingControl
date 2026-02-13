@@ -23,7 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 在系统文件资源管理器中打开路径
   openPath: (targetPath) => ipcRenderer.invoke('shell:openPath', targetPath),
   // 软链接操作
-  createSymlink: (target, linkPath) => ipcRenderer.invoke('symlink:create', target, linkPath),
+  createSymlink: (target, linkPath, type) => ipcRenderer.invoke('symlink:create', target, linkPath, type),
   checkSymlink: (targetPath) => ipcRenderer.invoke('symlink:check', targetPath),
   // 目录操作
   ensureDir: (dirPath) => ipcRenderer.invoke('dir:ensure', dirPath),

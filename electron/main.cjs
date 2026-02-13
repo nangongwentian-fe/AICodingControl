@@ -328,7 +328,7 @@ function setupIpcHandlers() {
   });
 
   // 创建软链接
-  ipcMain.handle('symlink:create', async (_, target, linkPath) => {
+  ipcMain.handle('symlink:create', async (_, target, linkPath, type) => {
     try {
       const linkParent = path.dirname(linkPath);
       if (!fs.existsSync(linkParent)) {
@@ -337,7 +337,7 @@ function setupIpcHandlers() {
       if (fs.existsSync(linkPath)) {
         fs.rmSync(linkPath, { recursive: true, force: true });
       }
-      fs.symlinkSync(target, linkPath, 'dir');
+      fs.symlinkSync(target, linkPath, type || 'dir');
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

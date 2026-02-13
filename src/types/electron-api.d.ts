@@ -54,7 +54,7 @@ interface ElectronAPI {
   saveAiTools: (config: AiToolsConfig) => Promise<FileResult>;
   openExternal: (url: string) => Promise<OperationResult>;
   openPath: (targetPath: string) => Promise<OperationResult>;
-  createSymlink: (target: string, linkPath: string) => Promise<OperationResult>;
+  createSymlink: (target: string, linkPath: string, type?: 'file' | 'dir') => Promise<OperationResult>;
   checkSymlink: (targetPath: string) => Promise<SymlinkCheckResult>;
   ensureDir: (dirPath: string) => Promise<OperationResult>;
   moveDir: (sourcePath: string, targetPath: string) => Promise<OperationResult>;
