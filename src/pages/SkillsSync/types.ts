@@ -11,8 +11,3 @@ export interface SkillItem {
   name: string;
   toolStatus: SkillToolStatus;
 }
-
-export interface SyncRequest {
-  skillName: string;
-  targetToolId: AiToolId;
-}

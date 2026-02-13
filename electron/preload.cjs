@@ -20,4 +20,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveAiTools: (config) => ipcRenderer.invoke('app:saveAiTools', config),
   // 打开外部链接
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  // 在系统文件资源管理器中打开路径
+  openPath: (targetPath) => ipcRenderer.invoke('shell:openPath', targetPath),
+  // 软链接操作
+  createSymlink: (target, linkPath) => ipcRenderer.invoke('symlink:create', target, linkPath),
+  checkSymlink: (targetPath) => ipcRenderer.invoke('symlink:check', targetPath),
+  // 目录操作
+  ensureDir: (dirPath) => ipcRenderer.invoke('dir:ensure', dirPath),
+  moveDir: (sourcePath, targetPath) => ipcRenderer.invoke('dir:move', sourcePath, targetPath),
 });

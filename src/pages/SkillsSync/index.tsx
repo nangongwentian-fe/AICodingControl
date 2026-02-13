@@ -1,6 +1,6 @@
 import type { AiToolId } from '@/types/ai-tools';
-import type { SkillItem, SkillTool, SkillToolStatus, SyncRequest } from './types';
-import { Button, Empty, message, Modal, Select, Spin } from 'antd';
+import type { SkillItem, SkillTool, SkillToolStatus } from './types';
+import { Button, Empty, message, Modal, Spin } from 'antd';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ReloadOutlined } from '@ant-design/icons';
 import compact from 'lodash/compact';
@@ -10,15 +10,11 @@ import sortBy from 'lodash/sortBy';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath, joinPath } from '@/utils/path';
 import SkillCard from './SkillCard';
-import { SKILL_DEFINITION_FILE } from './const';
+import { CENTRAL_SKILLS_PATH, SKILL_DEFINITION_FILE } from './const';
 
 function SkillsSync(): JSX.Element {
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [syncRequest, setSyncRequest] = useState<SyncRequest | null>(null);
-  const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [syncSourceToolId, setSyncSourceToolId] = useState<AiToolId | null>(null);
-  const [syncing, setSyncing] = useState(false);
 
   const { tools, loading: toolsLoading } = useAiTools();
 
@@ -55,6 +51,31 @@ function SkillsSync(): JSX.Element {
     return compact(checks);
   }, []);
 
+  /** 将工具目录中的真实 skill 文件夹迁移到中心目录，并替换为软链接 */
+  const migrateSkillIfNeeded = useCallback(async (
+    skillName: string,
+    toolSkillsPath: string,
+    centralRoot: string,
+  ): Promise<void> => {
+    const skillPath = joinPath(toolSkillsPath, skillName);
+    const symlinkResult = await window.electronAPI.checkSymlink(skillPath);
+    if (symlinkResult.isSymlink) return; // 已经是软链接，无需迁移
+
+    const centralSkillPath = joinPath(centralRoot, skillName);
+    const centralExists = await window.electronAPI.pathExists(centralSkillPath);
+
+    if (!centralExists.exists) {
+      // 中心目录没有，移动过去
+      await window.electronAPI.moveDir(skillPath, centralSkillPath);
+    } else {
+      // 中心目录已有，删除工具目录中的副本
+      await window.electronAPI.removeDir(skillPath);
+    }
+
+    // 创建软链接
+    await window.electronAPI.createSymlink(centralSkillPath, skillPath);
+  }, []);
+
   const loadAllSkills = useCallback(async (): Promise<void> => {
     if (skillTools.length === 0) {
       setSkills([]);
@@ -63,6 +84,9 @@ function SkillsSync(): JSX.Element {
     }
 
     setLoading(true);
+
+    const centralRoot = await expandPath(CENTRAL_SKILLS_PATH);
+    await window.electronAPI.ensureDir(centralRoot);
 
     const settled = await Promise.allSettled(
       skillTools.map(async (tool) => {
@@ -74,6 +98,12 @@ function SkillsSync(): JSX.Element {
 
         const entries = dirResult.entries ?? [];
         const filteredSkills = await filterSkillFolders(skillsPath, entries);
+
+        // 迁移：将真实目录移到中心并替换为软链接
+        await Promise.all(
+          filteredSkills.map((name) => migrateSkillIfNeeded(name, skillsPath, centralRoot)),
+        );
+
         return { toolId: tool.id as AiToolId, skills: filteredSkills };
       }),
     );
@@ -104,7 +134,7 @@ function SkillsSync(): JSX.Element {
     const mergedSkills = sortBy(Array.from(skillMap.values()), (skill) => skill.name.toLowerCase());
     setSkills(mergedSkills);
     setLoading(false);
-  }, [createEmptyToolStatus, filterSkillFolders, skillTools]);
+  }, [createEmptyToolStatus, filterSkillFolders, migrateSkillIfNeeded, skillTools]);
 
   const updateSkillStatus = useCallback((skillName: string, toolId: AiToolId, enabled: boolean): void => {
     setSkills((prev) => {
@@ -136,38 +166,49 @@ function SkillsSync(): JSX.Element {
     return skillTools.filter((tool) => tool.id !== targetToolId && skill.toolStatus[tool.id as AiToolId]);
   }, [skillTools, skillsByName]);
 
-  const syncSkillBetweenTools = useCallback(async (
+  /** 为目标工具启用 skill：确保中心目录有该 skill，然后创建软链接 */
+  const enableSkillForTool = useCallback(async (
     skillName: string,
-    sourceToolId: AiToolId,
     targetToolId: AiToolId,
   ): Promise<boolean> => {
-    const sourceTool = skillTools.find((tool) => tool.id === sourceToolId);
     const targetTool = skillTools.find((tool) => tool.id === targetToolId);
-
-    if (!sourceTool || !targetTool) {
+    if (!targetTool) {
       message.error('未找到对应的工具配置');
       return false;
     }
 
-    const sourceRoot = await expandPath(sourceTool.skillsPath);
-    const targetRoot = await expandPath(targetTool.skillsPath);
-    const sourcePath = joinPath(sourceRoot, skillName);
-    const targetPath = joinPath(targetRoot, skillName);
+    const centralRoot = await expandPath(CENTRAL_SKILLS_PATH);
+    const centralSkillPath = joinPath(centralRoot, skillName);
 
-    const sourceExists = await window.electronAPI.pathExists(sourcePath);
-    if (!sourceExists.success || !sourceExists.exists) {
-      message.error('源 Skill 不存在');
-      return false;
+    // 确保中心目录有该 skill
+    const centralExists = await window.electronAPI.pathExists(centralSkillPath);
+    if (!centralExists.exists) {
+      // 从已有的源工具复制到中心目录
+      const sources = getSourceTools(skillName, targetToolId);
+      if (sources.length === 0) {
+        message.error('未找到可同步的来源');
+        return false;
+      }
+      const sourceRoot = await expandPath(sources[0].skillsPath);
+      const sourcePath = joinPath(sourceRoot, skillName);
+      const copyResult = await window.electronAPI.copyDir(sourcePath, centralSkillPath);
+      if (!copyResult.success) {
+        message.error(`复制到中心目录失败: ${copyResult.error ?? '未知错误'}`);
+        return false;
+      }
     }
 
-    const result = await window.electronAPI.copyDir(sourcePath, targetPath);
+    // 在目标工具创建软链接
+    const targetRoot = await expandPath(targetTool.skillsPath);
+    const targetPath = joinPath(targetRoot, skillName);
+    const result = await window.electronAPI.createSymlink(centralSkillPath, targetPath);
     if (!result.success) {
-      message.error(`同步失败: ${result.error ?? '未知错误'}`);
+      message.error(`创建软链接失败: ${result.error ?? '未知错误'}`);
       return false;
     }
 
     return true;
-  }, [skillTools]);
+  }, [getSourceTools, skillTools]);
 
   const removeSkillFromTool = useCallback(async (skillName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = skillTools.find((item) => item.id === toolId);
@@ -189,29 +230,16 @@ function SkillsSync(): JSX.Element {
   }, [skillTools]);
 
   const handleEnableSkill = useCallback(async (skillName: string, toolId: AiToolId): Promise<void> => {
-    const sources = getSourceTools(skillName, toolId);
     const targetToolName = skillTools.find((tool) => tool.id === toolId)?.name ?? '目标工具';
 
-    if (sources.length === 0) {
-      message.error('未找到可同步的来源');
-      return;
+    updateSkillStatus(skillName, toolId, true);
+    const ok = await enableSkillForTool(skillName, toolId);
+    if (ok) {
+      message.success(`已同步到 ${targetToolName}`);
+    } else {
+      updateSkillStatus(skillName, toolId, false);
     }
-
-    if (sources.length === 1) {
-      updateSkillStatus(skillName, toolId, true);
-      const ok = await syncSkillBetweenTools(skillName, sources[0].id as AiToolId, toolId);
-      if (ok) {
-        message.success(`已同步到 ${targetToolName}`);
-      } else {
-        updateSkillStatus(skillName, toolId, false);
-      }
-      return;
-    }
-
-    setSyncRequest({ skillName, targetToolId: toolId });
-    setSyncSourceToolId(sources[0].id as AiToolId);
-    setSyncModalOpen(true);
-  }, [getSourceTools, skillTools, syncSkillBetweenTools, updateSkillStatus]);
+  }, [enableSkillForTool, skillTools, updateSkillStatus]);
 
   const handleDisableSkill = useCallback((skillName: string, toolId: AiToolId): void => {
     const targetTool = skillTools.find((tool) => tool.id === toolId);
@@ -240,42 +268,6 @@ function SkillsSync(): JSX.Element {
 
     handleDisableSkill(skillName, toolId);
   }, [handleDisableSkill, handleEnableSkill]);
-
-  const handleSyncConfirm = useCallback(async (): Promise<void> => {
-    if (!syncRequest || !syncSourceToolId) return;
-
-    setSyncing(true);
-    updateSkillStatus(syncRequest.skillName, syncRequest.targetToolId, true);
-
-    const ok = await syncSkillBetweenTools(
-      syncRequest.skillName,
-      syncSourceToolId,
-      syncRequest.targetToolId,
-    );
-
-    if (ok) {
-      message.success('同步成功');
-    } else {
-      updateSkillStatus(syncRequest.skillName, syncRequest.targetToolId, false);
-    }
-
-    setSyncing(false);
-    setSyncModalOpen(false);
-    setSyncRequest(null);
-    setSyncSourceToolId(null);
-  }, [syncRequest, syncSourceToolId, syncSkillBetweenTools, updateSkillStatus]);
-
-  const handleSyncCancel = useCallback((): void => {
-    setSyncModalOpen(false);
-    setSyncRequest(null);
-    setSyncSourceToolId(null);
-  }, []);
-
-  const sourceOptions = useMemo(() => {
-    if (!syncRequest) return [];
-    const sources = getSourceTools(syncRequest.skillName, syncRequest.targetToolId);
-    return sources.map((tool) => ({ label: tool.name, value: tool.id }));
-  }, [getSourceTools, syncRequest]);
 
   useEffect(() => {
     if (toolsLoading) return;
@@ -338,34 +330,6 @@ function SkillsSync(): JSX.Element {
       </div>
 
       {content}
-
-      <Modal
-        title="选择同步来源"
-        open={syncModalOpen}
-        onOk={() => void handleSyncConfirm()}
-        onCancel={handleSyncCancel}
-        okText="同步"
-        cancelText="取消"
-        confirmLoading={syncing}
-      >
-        {syncRequest ? (
-          <div className="space-y-3">
-            <div>
-              将 <span className="font-medium">{syncRequest.skillName}</span> 同步到
-              <span className="ml-1 font-medium">
-                {skillTools.find((tool) => tool.id === syncRequest.targetToolId)?.name ?? '目标工具'}
-              </span>
-            </div>
-            <Select
-              className="w-full"
-              placeholder="选择来源工具"
-              options={sourceOptions}
-              value={syncSourceToolId ?? undefined}
-              onChange={(value) => setSyncSourceToolId(value as AiToolId)}
-            />
-          </div>
-        ) : null}
-      </Modal>
     </div>
   );
 }

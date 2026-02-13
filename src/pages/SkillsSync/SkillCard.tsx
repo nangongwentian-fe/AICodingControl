@@ -1,7 +1,10 @@
 import type { AiToolId } from '@/types/ai-tools';
 import type { SkillItem, SkillTool } from './types';
-import { Avatar, Card, Switch } from 'antd';
-import { memo } from 'react';
+import { Avatar, Button, Card, Switch } from 'antd';
+import { memo, useCallback } from 'react';
+import { FolderOpenOutlined } from '@ant-design/icons';
+import { expandPath, joinPath } from '@/utils/path';
+import { CENTRAL_SKILLS_PATH } from './const';
 
 export interface SkillCardProps {
   skill: SkillItem;
@@ -10,8 +13,25 @@ export interface SkillCardProps {
 }
 
 function SkillCard({ skill, tools, onToggleTool }: SkillCardProps): JSX.Element {
+  const handleOpenFolder = useCallback(async () => {
+    const centralRoot = await expandPath(CENTRAL_SKILLS_PATH);
+    const skillPath = joinPath(centralRoot, skill.name);
+    await window.electronAPI.openPath(skillPath);
+  }, [skill.name]);
+
   return (
-    <Card title={skill.name} hoverable>
+    <Card
+      title={skill.name}
+      extra={
+        <Button
+          type="text"
+          size="small"
+          icon={<FolderOpenOutlined />}
+          onClick={handleOpenFolder}
+        />
+      }
+      hoverable
+    >
       <div className="flex flex-col">
         {tools.map((tool) => (
           <div

@@ -316,6 +316,79 @@ function setupIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // 在系统文件资源管理器中打开路径
+  ipcMain.handle('shell:openPath', async (_, targetPath) => {
+    try {
+      await shell.openPath(targetPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 创建软链接
+  ipcMain.handle('symlink:create', async (_, target, linkPath) => {
+    try {
+      const linkParent = path.dirname(linkPath);
+      if (!fs.existsSync(linkParent)) {
+        fs.mkdirSync(linkParent, { recursive: true });
+      }
+      if (fs.existsSync(linkPath)) {
+        fs.rmSync(linkPath, { recursive: true, force: true });
+      }
+      fs.symlinkSync(target, linkPath, 'dir');
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 检查是否为软链接
+  ipcMain.handle('symlink:check', async (_, targetPath) => {
+    try {
+      if (!fs.existsSync(targetPath)) {
+        return { success: true, isSymlink: false };
+      }
+      const stats = fs.lstatSync(targetPath);
+      return { success: true, isSymlink: stats.isSymbolicLink() };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 确保目录存在
+  ipcMain.handle('dir:ensure', async (_, dirPath) => {
+    try {
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 移动目录
+  ipcMain.handle('dir:move', async (_, sourcePath, targetPath) => {
+    try {
+      const targetParent = path.dirname(targetPath);
+      if (!fs.existsSync(targetParent)) {
+        fs.mkdirSync(targetParent, { recursive: true });
+      }
+      fs.renameSync(sourcePath, targetPath);
+      return { success: true };
+    } catch (error) {
+      // renameSync 跨设备可能失败，回退到 copy + remove
+      try {
+        fs.cpSync(sourcePath, targetPath, { recursive: true });
+        fs.rmSync(sourcePath, { recursive: true, force: true });
+        return { success: true };
+      } catch (fallbackError) {
+        return { success: false, error: fallbackError.message };
+      }
+    }
+  });
 }
 
 function createWindow() {
