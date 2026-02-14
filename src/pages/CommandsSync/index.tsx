@@ -3,7 +3,7 @@ import type { CommandItem, CommandTool, CommandToolStatus, EditRequest } from '.
 import { Button, Empty, message, Modal, Spin } from 'antd';
 import debounce from 'lodash/debounce';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ReloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined, FolderOutlined } from '@ant-design/icons';
 import filter from 'lodash/filter';
 import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
@@ -259,6 +259,11 @@ function CommandsSync(): JSX.Element {
     return joinPath(centralRoot, commandName);
   }, []);
 
+  const handleOpenFolder = useCallback(async (): Promise<void> => {
+    const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
+    await window.electronAPI.openPath(centralRoot);
+  }, []);
+
   const handleOpenEdit = useCallback((commandName: string): void => {
     setEditContent('');
     setEditLoading(false);
@@ -367,6 +372,9 @@ function CommandsSync(): JSX.Element {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-medium">Commands 列表</h2>
         <div className="flex gap-2">
+          <Button icon={<FolderOutlined />} onClick={() => void handleOpenFolder()}>
+            打开 Commands 文件夹
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={() => void loadAllCommands()} loading={isLoading}>
             刷新
           </Button>
