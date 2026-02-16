@@ -35,6 +35,38 @@ function setupFileIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // 文件复制 IPC
+  ipcMain.handle('file:copy', async (event, sourcePath, targetPath) => {
+    try {
+      if (!fs.existsSync(sourcePath)) {
+        return { success: false, error: '源文件不存在' };
+      }
+      const targetDir = path.dirname(targetPath);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      if (fs.existsSync(targetPath)) {
+        fs.rmSync(targetPath, { recursive: true, force: true });
+      }
+      fs.copyFileSync(sourcePath, targetPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 文件删除 IPC
+  ipcMain.handle('file:remove', async (event, targetPath) => {
+    try {
+      if (fs.existsSync(targetPath)) {
+        fs.rmSync(targetPath, { recursive: true, force: true });
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 module.exports = { setupFileIpcHandlers };

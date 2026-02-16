@@ -43,6 +43,8 @@ interface ElectronAPI {
   closeWindow: () => void;
   readFile: (filePath: string) => Promise<FileResult>;
   writeFile: (filePath: string, content: string) => Promise<FileResult>;
+  copyFile: (sourcePath: string, targetPath: string) => Promise<OperationResult>;
+  removeFile: (targetPath: string) => Promise<OperationResult>;
   readDir: (dirPath: string) => Promise<DirectoryResult>;
   readDirFiles: (dirPath: string) => Promise<DirectoryResult>;
   pathExists: (targetPath: string) => Promise<ExistsResult>;

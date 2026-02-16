@@ -3,3 +3,9 @@ export const COMMAND_EDITOR_HEIGHT = '60vh';
 
 /** 中心化 Commands 存储路径（所有 command 的单一来源） */
 export const CENTRAL_COMMANDS_PATH = '~/.ai-coding-control/commands';
+
+/** 拖拽区域接受的命令文件扩展名 */
+export const ACCEPTED_COMMAND_EXTENSIONS = ['.md'];
+
+/** 拖拽区域的提示文字 */
+export const DRAG_AREA_MESSAGE = '拖拽 .md 文件到此处，或点击选择文件';

@@ -1,17 +1,23 @@
 import type { AiToolId } from '@/types/ai-tools';
-import type { CommandItem, CommandTool, CommandToolStatus, EditRequest } from './types';
-import { Button, Empty, message, Modal, Spin } from 'antd';
+import type { CommandItem, CommandTool, CommandToolStatus, EditRequest, UploadedFile } from './types';
+import { Button, Empty, message, Modal, Spin, Upload } from 'antd';
+import type { RcFile } from 'antd/es/upload';
 import debounce from 'lodash/debounce';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ReloadOutlined, FolderOutlined } from '@ant-design/icons';
+import { ReloadOutlined, FolderOutlined, PlusOutlined, FileOutlined, InboxOutlined } from '@ant-design/icons';
 import filter from 'lodash/filter';
-import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
 import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath, joinPath } from '@/utils/path';
 import CommandCard from './CommandCard';
-import { CENTRAL_COMMANDS_PATH, COMMAND_EDITOR_HEIGHT, COMMAND_FILE_EXTENSION } from './const';
+import {
+  ACCEPTED_COMMAND_EXTENSIONS,
+  CENTRAL_COMMANDS_PATH,
+  COMMAND_EDITOR_HEIGHT,
+  COMMAND_FILE_EXTENSION,
+  DRAG_AREA_MESSAGE,
+} from './const';
 
 function CommandsSync(): JSX.Element {
   const [commands, setCommands] = useState<CommandItem[]>([]);
@@ -20,6 +26,11 @@ function CommandsSync(): JSX.Element {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editContent, setEditContent] = useState('');
+
+  // 添加 Command 相关的状态
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [addLoading, setAddLoading] = useState(false);
 
   const { tools, loading: toolsLoading } = useAiTools();
 
@@ -44,28 +55,6 @@ function CommandsSync(): JSX.Element {
     return filter(entries, (entry) => entry.toLowerCase().endsWith(COMMAND_FILE_EXTENSION));
   }, []);
 
-  /** 将工具目录中的真实 command 文件迁移到中心目录，并替换为软链接 */
-  const migrateCommandIfNeeded = useCallback(async (
-    commandName: string,
-    toolCommandsPath: string,
-    centralRoot: string,
-  ): Promise<void> => {
-    const commandPath = joinPath(toolCommandsPath, commandName);
-    const symlinkResult = await window.electronAPI.checkSymlink(commandPath);
-    if (symlinkResult.isSymlink) return;
-
-    const centralCommandPath = joinPath(centralRoot, commandName);
-    const centralExists = await window.electronAPI.pathExists(centralCommandPath);
-
-    if (!centralExists.exists) {
-      await window.electronAPI.moveDir(commandPath, centralCommandPath);
-    } else {
-      await window.electronAPI.removeDir(commandPath);
-    }
-
-    await window.electronAPI.createSymlink(centralCommandPath, commandPath, 'file');
-  }, []);
-
   const loadAllCommands = useCallback(async (): Promise<void> => {
     if (commandTools.length === 0) {
       setCommands([]);
@@ -74,56 +63,65 @@ function CommandsSync(): JSX.Element {
     }
 
     setLoading(true);
+    try {
+      const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
+      const centralDirResult = await window.electronAPI.readDirFiles(centralRoot);
+      const centralCommands = centralDirResult.success && centralDirResult.exists
+        ? filterCommandFiles(centralDirResult.entries ?? [])
+        : [];
 
-    const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
-    await window.electronAPI.ensureDir(centralRoot);
+      const settled = await Promise.allSettled(
+        commandTools.map(async (tool) => {
+          const commandsPath = await expandPath(tool.commandsPath);
+          const dirResult = await window.electronAPI.readDirFiles(commandsPath);
+          if (!dirResult.success || !dirResult.exists) {
+            return { toolId: tool.id as AiToolId, commands: [] as string[] };
+          }
 
-    const settled = await Promise.allSettled(
-      commandTools.map(async (tool) => {
-        const commandsPath = await expandPath(tool.commandsPath);
-        const dirResult = await window.electronAPI.readDirFiles(commandsPath);
-        if (!dirResult.success || !dirResult.exists) {
-          return { toolId: tool.id as AiToolId, commands: [] as string[] };
-        }
+          const entries = dirResult.entries ?? [];
+          const filteredCommands = filterCommandFiles(entries);
+          return { toolId: tool.id as AiToolId, commands: filteredCommands };
+        }),
+      );
 
-        const entries = dirResult.entries ?? [];
-        const filteredCommands = filterCommandFiles(entries);
+      const fulfilled = settled
+        .filter((item): item is PromiseFulfilledResult<{ toolId: AiToolId; commands: string[] }> => item.status === 'fulfilled')
+        .map((item) => item.value);
 
-        await Promise.all(
-          filteredCommands.map((name) => migrateCommandIfNeeded(name, commandsPath, centralRoot)),
-        );
+      if (fulfilled.length !== settled.length || !centralDirResult.success) {
+        message.error('部分 Commands 读取失败');
+      }
 
-        return { toolId: tool.id as AiToolId, commands: filteredCommands };
-      }),
-    );
+      const commandMap = new Map<string, CommandItem>();
 
-    const fulfilled = settled
-      .filter((item): item is PromiseFulfilledResult<{ toolId: AiToolId; commands: string[] }> => item.status === 'fulfilled')
-      .map((item) => item.value);
-
-    if (fulfilled.length !== settled.length) {
-      message.error('部分 Commands 读取失败');
-    }
-
-    const commandMap = new Map<string, CommandItem>();
-
-    for (const { toolId, commands: toolCommands } of fulfilled) {
-      for (const commandName of toolCommands) {
-        const existing = commandMap.get(commandName);
-        if (existing) {
-          existing.toolStatus[toolId] = true;
-        } else {
-          const toolStatus = createEmptyToolStatus();
-          toolStatus[toolId] = true;
-          commandMap.set(commandName, { name: commandName, toolStatus });
+      for (const commandName of centralCommands) {
+        if (!commandMap.has(commandName)) {
+          commandMap.set(commandName, {
+            name: commandName,
+            toolStatus: createEmptyToolStatus(),
+          });
         }
       }
-    }
 
-    const mergedCommands = sortBy(Array.from(commandMap.values()), (command) => command.name.toLowerCase());
-    setCommands(mergedCommands);
-    setLoading(false);
-  }, [commandTools, createEmptyToolStatus, filterCommandFiles, migrateCommandIfNeeded]);
+      for (const { toolId, commands: toolCommands } of fulfilled) {
+        for (const commandName of toolCommands) {
+          const existing = commandMap.get(commandName);
+          if (existing) {
+            existing.toolStatus[toolId] = true;
+          } else {
+            const toolStatus = createEmptyToolStatus();
+            toolStatus[toolId] = true;
+            commandMap.set(commandName, { name: commandName, toolStatus });
+          }
+        }
+      }
+
+      const mergedCommands = sortBy(Array.from(commandMap.values()), (command) => command.name.toLowerCase());
+      setCommands(mergedCommands);
+    } finally {
+      setLoading(false);
+    }
+  }, [commandTools, createEmptyToolStatus, filterCommandFiles]);
 
   const updateCommandStatus = useCallback((commandName: string, toolId: AiToolId, enabled: boolean): void => {
     setCommands((prev) => {
@@ -144,8 +142,7 @@ function CommandsSync(): JSX.Element {
         };
       });
 
-      const filtered = updated.filter((command) => some(command.toolStatus));
-      return sortBy(filtered, (command) => command.name.toLowerCase());
+      return sortBy(updated, (command) => command.name.toLowerCase());
     });
   }, [createEmptyToolStatus]);
 
@@ -154,6 +151,40 @@ function CommandsSync(): JSX.Element {
     if (!command) return [];
     return commandTools.filter((tool) => tool.id !== targetToolId && command.toolStatus[tool.id as AiToolId]);
   }, [commandTools, commands]);
+
+  const getAllSourceTools = useCallback((commandName: string): CommandTool[] => {
+    const command = commands.find((c) => c.name === commandName);
+    if (!command) return [];
+    return commandTools.filter((tool) => command.toolStatus[tool.id as AiToolId]);
+  }, [commandTools, commands]);
+
+  const ensureCentralCommandFile = useCallback(async (
+    commandName: string,
+    sources: CommandTool[],
+  ): Promise<string | null> => {
+    const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
+    await window.electronAPI.ensureDir(centralRoot);
+    const centralCommandPath = joinPath(centralRoot, commandName);
+
+    const centralExists = await window.electronAPI.pathExists(centralCommandPath);
+    if (centralExists.success && centralExists.exists) {
+      return centralCommandPath;
+    }
+
+    for (const sourceTool of sources) {
+      const sourceRoot = await expandPath(sourceTool.commandsPath);
+      const sourcePath = joinPath(sourceRoot, commandName);
+      const sourceExists = await window.electronAPI.pathExists(sourcePath);
+      if (!sourceExists.success || !sourceExists.exists) continue;
+
+      const copyResult = await window.electronAPI.copyFile(sourcePath, centralCommandPath);
+      if (copyResult.success) {
+        return centralCommandPath;
+      }
+    }
+
+    return null;
+  }, []);
 
   const enableCommandForTool = useCallback(async (
     commandName: string,
@@ -165,35 +196,23 @@ function CommandsSync(): JSX.Element {
       return false;
     }
 
-    const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
-    const centralCommandPath = joinPath(centralRoot, commandName);
-
-    const centralExists = await window.electronAPI.pathExists(centralCommandPath);
-    if (!centralExists.exists) {
-      const sources = getSourceTools(commandName, targetToolId);
-      if (sources.length === 0) {
-        message.error('未找到可同步的来源');
-        return false;
-      }
-      const sourceRoot = await expandPath(sources[0].commandsPath);
-      const sourcePath = joinPath(sourceRoot, commandName);
-      const copyResult = await window.electronAPI.copyDir(sourcePath, centralCommandPath);
-      if (!copyResult.success) {
-        message.error(`复制到中心目录失败: ${copyResult.error ?? '未知错误'}`);
-        return false;
-      }
+    const sources = getSourceTools(commandName, targetToolId);
+    const centralCommandPath = await ensureCentralCommandFile(commandName, sources);
+    if (!centralCommandPath) {
+      message.error('未找到可同步的来源');
+      return false;
     }
 
     const targetRoot = await expandPath(targetTool.commandsPath);
     const targetPath = joinPath(targetRoot, commandName);
-    const result = await window.electronAPI.createSymlink(centralCommandPath, targetPath, 'file');
+    const result = await window.electronAPI.copyFile(centralCommandPath, targetPath);
     if (!result.success) {
-      message.error(`创建软链接失败: ${result.error ?? '未知错误'}`);
+      message.error(`复制到目标工具失败: ${result.error ?? '未知错误'}`);
       return false;
     }
 
     return true;
-  }, [commandTools, getSourceTools]);
+  }, [commandTools, ensureCentralCommandFile, getSourceTools]);
 
   const removeCommandFromTool = useCallback(async (commandName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = commandTools.find((item) => item.id === toolId);
@@ -204,7 +223,7 @@ function CommandsSync(): JSX.Element {
 
     const targetRoot = await expandPath(tool.commandsPath);
     const targetPath = joinPath(targetRoot, commandName);
-    const result = await window.electronAPI.removeDir(targetPath);
+    const result = await window.electronAPI.removeFile(targetPath);
 
     if (!result.success) {
       message.error(`移除失败: ${result.error ?? '未知错误'}`);
@@ -236,14 +255,29 @@ function CommandsSync(): JSX.Element {
       okText: '移除',
       cancelText: '取消',
       onOk: async () => {
+        const allSources = getAllSourceTools(commandName);
+        const centralCommandPath = await ensureCentralCommandFile(commandName, allSources);
+        if (!centralCommandPath) {
+          message.error('移除前未找到可备份的 command 文件，已取消操作');
+          return;
+        }
+
         const ok = await removeCommandFromTool(commandName, toolId);
         if (ok) {
           updateCommandStatus(commandName, toolId, false);
+          await loadAllCommands();
           message.success(`已从 ${targetName} 移除`);
         }
       },
     });
-  }, [commandTools, removeCommandFromTool, updateCommandStatus]);
+  }, [
+    commandTools,
+    ensureCentralCommandFile,
+    getAllSourceTools,
+    loadAllCommands,
+    removeCommandFromTool,
+    updateCommandStatus,
+  ]);
 
   const handleToggleTool = useCallback(async (commandName: string, toolId: AiToolId, enabled: boolean): Promise<void> => {
     if (enabled) {
@@ -256,11 +290,13 @@ function CommandsSync(): JSX.Element {
 
   const getCentralCommandPath = useCallback(async (commandName: string): Promise<string> => {
     const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
+    await window.electronAPI.ensureDir(centralRoot);
     return joinPath(centralRoot, commandName);
   }, []);
 
   const handleOpenFolder = useCallback(async (): Promise<void> => {
     const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
+    await window.electronAPI.ensureDir(centralRoot);
     await window.electronAPI.openPath(centralRoot);
   }, []);
 
@@ -282,10 +318,34 @@ function CommandsSync(): JSX.Element {
   const debouncedSave = useMemo(
     () => debounce((content: string) => {
       if (!editRequest) return;
-      const filePath = getCentralCommandPath(editRequest.commandName);
-      window.electronAPI.writeFile(filePath, content);
+      void (async () => {
+        const commandName = editRequest.commandName;
+        const filePath = await getCentralCommandPath(commandName);
+        const writeResult = await window.electronAPI.writeFile(filePath, content);
+        if (!writeResult.success) {
+          message.error(`保存失败: ${writeResult.error ?? '未知错误'}`);
+          return;
+        }
+
+        const syncResults: Array<{ success: boolean; error?: string }> = await Promise.all(
+          commandTools.map(async (tool) => {
+            const targetRoot = await expandPath(tool.commandsPath);
+            const targetPath = joinPath(targetRoot, commandName);
+            const existsResult = await window.electronAPI.pathExists(targetPath);
+            if (!existsResult.success || !existsResult.exists) {
+              return { success: true as const };
+            }
+            return window.electronAPI.copyFile(filePath, targetPath);
+          }),
+        );
+
+        const failed = syncResults.find((result) => !result.success);
+        if (failed) {
+          message.error(`同步到工具目录失败: ${failed.error ?? '未知错误'}`);
+        }
+      })();
     }, 1000),
-    [editRequest, getCentralCommandPath],
+    [commandTools, editRequest, getCentralCommandPath],
   );
 
   const handleContentChange = useCallback((value: string | undefined) => {
@@ -295,6 +355,90 @@ function CommandsSync(): JSX.Element {
   }, [debouncedSave]);
 
   useEffect(() => {
+    return () => {
+      debouncedSave.cancel();
+    };
+  }, [debouncedSave]);
+
+  /** 处理文件选择 */
+  const handleFilesAdded = useCallback((files: File[]): void => {
+    setUploadedFiles((prev) => {
+      const next = [...prev];
+      const keys = new Set(prev.map((item) => `${item.file.name}-${item.file.size}-${item.file.lastModified}`));
+
+      for (const file of files) {
+        const lowerName = file.name.toLowerCase();
+        const isAccepted = ACCEPTED_COMMAND_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+        if (!isAccepted) continue;
+
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        if (keys.has(key)) continue;
+
+        keys.add(key);
+        next.push({ name: file.name, file });
+      }
+
+      return next;
+    });
+  }, []);
+
+  /** 处理添加 Command */
+  const handleAddCommands = useCallback(async (): Promise<void> => {
+    if (uploadedFiles.length === 0) return;
+
+    setAddLoading(true);
+
+    try {
+      const centralRoot = await expandPath(CENTRAL_COMMANDS_PATH);
+      await window.electronAPI.ensureDir(centralRoot);
+
+      for (const uploadedFile of uploadedFiles) {
+        // 获取文件名（去掉 .md 扩展名）
+        const commandName = uploadedFile.name.replace(/\.md$/i, '');
+
+        // 读取文件内容
+        const content = await uploadedFile.file.text();
+
+        // 写入中心化目录
+        const centralCommandPath = joinPath(centralRoot, `${commandName}.md`);
+        const writeResult = await window.electronAPI.writeFile(centralCommandPath, content);
+        if (!writeResult.success) {
+          throw new Error(writeResult.error ?? '中心目录写入失败');
+        }
+
+        // 复制到每个工具目录
+        for (const tool of commandTools) {
+          if (!tool.commandsPath) continue;
+
+          const targetRoot = await expandPath(tool.commandsPath);
+          const targetPath = joinPath(targetRoot, `${commandName}.md`);
+          const copyResult = await window.electronAPI.copyFile(centralCommandPath, targetPath);
+          if (!copyResult.success) {
+            throw new Error(copyResult.error ?? `复制到 ${tool.name} 失败`);
+          }
+        }
+      }
+
+      message.success(`成功添加 ${uploadedFiles.length} 个 Command`);
+      setAddModalOpen(false);
+      setUploadedFiles([]);
+
+      // 刷新命令列表
+      await loadAllCommands();
+    } catch (error) {
+      message.error(`添加失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      setAddLoading(false);
+    }
+  }, [uploadedFiles, commandTools, loadAllCommands]);
+
+  /** 关闭添加 Modal 时重置状态 */
+  const handleAddModalClose = useCallback((): void => {
+    setAddModalOpen(false);
+    setUploadedFiles([]);
+  }, []);
+
+  useEffect(() => {
     if (!editModalOpen || !editRequest) return;
 
     let cancelled = false;
@@ -302,7 +446,17 @@ function CommandsSync(): JSX.Element {
     const loadContent = async (): Promise<void> => {
       setEditLoading(true);
 
-      const filePath = await getCentralCommandPath(editRequest.commandName);
+      const sourceTools = getAllSourceTools(editRequest.commandName);
+      const filePath = await ensureCentralCommandFile(editRequest.commandName, sourceTools);
+      if (!filePath) {
+        if (!cancelled) {
+          setEditContent('');
+          message.error('读取失败: 未找到可编辑的 command 文件');
+          setEditLoading(false);
+        }
+        return;
+      }
+
       const result = await window.electronAPI.readFile(filePath);
       if (cancelled) return;
 
@@ -321,7 +475,7 @@ function CommandsSync(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [editModalOpen, editRequest, getCentralCommandPath]);
+  }, [editModalOpen, editRequest, ensureCentralCommandFile, getAllSourceTools]);
 
   useEffect(() => {
     if (toolsLoading) return;
@@ -375,6 +529,9 @@ function CommandsSync(): JSX.Element {
           <Button icon={<FolderOutlined />} onClick={() => void handleOpenFolder()}>
             打开 Commands 文件夹
           </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
+            添加 Command
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={() => void loadAllCommands()} loading={isLoading}>
             刷新
           </Button>
@@ -409,6 +566,59 @@ function CommandsSync(): JSX.Element {
             )}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        title="添加 Command"
+        open={addModalOpen}
+        onCancel={handleAddModalClose}
+        footer={null}
+        width={600}
+        destroyOnHidden
+      >
+        <Upload
+          accept={ACCEPTED_COMMAND_EXTENSIONS.join(',')}
+          multiple
+          showUploadList={false}
+          beforeUpload={(file) => {
+            handleFilesAdded([file as RcFile]);
+            // 阻止实际上传
+            return false;
+          }}
+        >
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors">
+            <InboxOutlined className="text-4xl text-gray-400 mb-2" />
+            <p className="text-gray-600">{DRAG_AREA_MESSAGE}</p>
+          </div>
+        </Upload>
+
+        {uploadedFiles.length > 0 && (
+          <div className="mt-4">
+            <h4 className="font-medium mb-2">已选择 {uploadedFiles.length} 个文件：</h4>
+            <ul className="space-y-1">
+              {uploadedFiles.map((file) => (
+                <li key={file.name} className="flex items-center gap-2 text-sm">
+                  <FileOutlined />
+                  <span>{file.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button onClick={handleAddModalClose}>
+            取消
+          </Button>
+          <Button
+            type="primary"
+            loading={addLoading}
+            disabled={uploadedFiles.length === 0}
+            onClick={() => void handleAddCommands()}
+          >
+            确认添加
+          </Button>
+        </div>
       </Modal>
     </div>
   );

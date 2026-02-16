@@ -10,7 +10,7 @@ import sortBy from 'lodash/sortBy';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath, joinPath } from '@/utils/path';
 import SkillCard from './SkillCard';
-import { CENTRAL_SKILLS_PATH, SKILL_DEFINITION_FILE } from './const';
+import { SKILL_DEFINITION_FILE } from './const';
 
 function SkillsSync(): JSX.Element {
   const [skills, setSkills] = useState<SkillItem[]>([]);
@@ -51,31 +51,6 @@ function SkillsSync(): JSX.Element {
     return compact(checks);
   }, []);
 
-  /** 将工具目录中的真实 skill 文件夹迁移到中心目录，并替换为软链接 */
-  const migrateSkillIfNeeded = useCallback(async (
-    skillName: string,
-    toolSkillsPath: string,
-    centralRoot: string,
-  ): Promise<void> => {
-    const skillPath = joinPath(toolSkillsPath, skillName);
-    const symlinkResult = await window.electronAPI.checkSymlink(skillPath);
-    if (symlinkResult.isSymlink) return; // 已经是软链接，无需迁移
-
-    const centralSkillPath = joinPath(centralRoot, skillName);
-    const centralExists = await window.electronAPI.pathExists(centralSkillPath);
-
-    if (!centralExists.exists) {
-      // 中心目录没有，移动过去
-      await window.electronAPI.moveDir(skillPath, centralSkillPath);
-    } else {
-      // 中心目录已有，删除工具目录中的副本
-      await window.electronAPI.removeDir(skillPath);
-    }
-
-    // 创建软链接
-    await window.electronAPI.createSymlink(centralSkillPath, skillPath);
-  }, []);
-
   const loadAllSkills = useCallback(async (): Promise<void> => {
     if (skillTools.length === 0) {
       setSkills([]);
@@ -84,9 +59,6 @@ function SkillsSync(): JSX.Element {
     }
 
     setLoading(true);
-
-    const centralRoot = await expandPath(CENTRAL_SKILLS_PATH);
-    await window.electronAPI.ensureDir(centralRoot);
 
     const settled = await Promise.allSettled(
       skillTools.map(async (tool) => {
@@ -98,11 +70,6 @@ function SkillsSync(): JSX.Element {
 
         const entries = dirResult.entries ?? [];
         const filteredSkills = await filterSkillFolders(skillsPath, entries);
-
-        // 迁移：将真实目录移到中心并替换为软链接
-        await Promise.all(
-          filteredSkills.map((name) => migrateSkillIfNeeded(name, skillsPath, centralRoot)),
-        );
 
         return { toolId: tool.id as AiToolId, skills: filteredSkills };
       }),
@@ -134,7 +101,7 @@ function SkillsSync(): JSX.Element {
     const mergedSkills = sortBy(Array.from(skillMap.values()), (skill) => skill.name.toLowerCase());
     setSkills(mergedSkills);
     setLoading(false);
-  }, [createEmptyToolStatus, filterSkillFolders, migrateSkillIfNeeded, skillTools]);
+  }, [createEmptyToolStatus, filterSkillFolders, skillTools]);
 
   const updateSkillStatus = useCallback((skillName: string, toolId: AiToolId, enabled: boolean): void => {
     setSkills((prev) => {
@@ -166,7 +133,7 @@ function SkillsSync(): JSX.Element {
     return skillTools.filter((tool) => tool.id !== targetToolId && skill.toolStatus[tool.id as AiToolId]);
   }, [skillTools, skillsByName]);
 
-  /** 为目标工具启用 skill：确保中心目录有该 skill，然后创建软链接 */
+  /** 为目标工具启用 skill：从源工具复制 skill 到目标工具 */
   const enableSkillForTool = useCallback(async (
     skillName: string,
     targetToolId: AiToolId,
@@ -177,33 +144,22 @@ function SkillsSync(): JSX.Element {
       return false;
     }
 
-    const centralRoot = await expandPath(CENTRAL_SKILLS_PATH);
-    const centralSkillPath = joinPath(centralRoot, skillName);
-
-    // 确保中心目录有该 skill
-    const centralExists = await window.electronAPI.pathExists(centralSkillPath);
-    if (!centralExists.exists) {
-      // 从已有的源工具复制到中心目录
-      const sources = getSourceTools(skillName, targetToolId);
-      if (sources.length === 0) {
-        message.error('未找到可同步的来源');
-        return false;
-      }
-      const sourceRoot = await expandPath(sources[0].skillsPath);
-      const sourcePath = joinPath(sourceRoot, skillName);
-      const copyResult = await window.electronAPI.copyDir(sourcePath, centralSkillPath);
-      if (!copyResult.success) {
-        message.error(`复制到中心目录失败: ${copyResult.error ?? '未知错误'}`);
-        return false;
-      }
+    // 从已有的源工具复制
+    const sources = getSourceTools(skillName, targetToolId);
+    if (sources.length === 0) {
+      message.error('未找到可同步的来源');
+      return false;
     }
 
-    // 在目标工具创建软链接
+    const sourceRoot = await expandPath(sources[0].skillsPath);
+    const sourcePath = joinPath(sourceRoot, skillName);
     const targetRoot = await expandPath(targetTool.skillsPath);
     const targetPath = joinPath(targetRoot, skillName);
-    const result = await window.electronAPI.createSymlink(centralSkillPath, targetPath);
-    if (!result.success) {
-      message.error(`创建软链接失败: ${result.error ?? '未知错误'}`);
+
+    // 复制到目标工具目录
+    const copyResult = await window.electronAPI.copyDir(sourcePath, targetPath);
+    if (!copyResult.success) {
+      message.error(`复制失败: ${copyResult.error ?? '未知错误'}`);
       return false;
     }
 

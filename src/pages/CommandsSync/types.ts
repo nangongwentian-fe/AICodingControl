@@ -15,3 +15,8 @@ export interface CommandItem {
 export interface EditRequest {
   commandName: string;
 }
+
+export interface UploadedFile {
+  name: string;
+  file: File;
+}
