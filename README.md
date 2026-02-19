@@ -19,10 +19,27 @@
 ## 功能特性
 
 - **Rule 同步** — 编写一份编码规则，一键同步到所有工具（CLAUDE.md、AGENTS.md、user_rules.md 等）
+
+  ![Rule Sync](docs/images/rule-sync.png)
+
 - **MCP 同步** — 可视化管理 MCP（Model Context Protocol）服务器配置，支持按工具独立开关
+
+  ![MCP Sync](docs/images/mcp-sync.png)
+
 - **Skills 同步** — 在工具间一键复制技能包
+
+  ![Skills Sync](docs/images/skills-sync.png)
+
 - **Commands 同步** — 保持自定义命令在所有 AI 助手间一致
+
+  ![Commands Sync](docs/images/slash-commands-sync.png)
+
 - **可视化编辑器** — 内置 Monaco 编辑器，直接编辑规则和配置
+
+- **ClaudeCode 快捷配置** — 一键绕过 Plugin 登陆，快速编辑 settings.json 和 .claude.json
+
+  ![ClaudeCode Quick Settings](docs/images/claude-code-quick-settings.png)
+
 - **可扩展** — 支持通过配置文件添加自定义 AI 工具
 
 ## 支持的工具

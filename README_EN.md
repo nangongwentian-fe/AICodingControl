@@ -19,10 +19,26 @@ If you use more than one AI coding tool (Claude Code, Cursor, Trae, Codex, etc.)
 ## Features
 
 - **Rule Sync** — Write your coding rules once, sync to all tools (CLAUDE.md, AGENTS.md, user_rules.md, etc.)
+
+  ![Rule Sync](docs/images/rule-sync.png)
+
 - **MCP Sync** — Visually manage MCP (Model Context Protocol) server configs with per-tool toggles
+
+  ![MCP Sync](docs/images/mcp-sync.png)
+
 - **Skills Sync** — Copy skill packages between tools with one click
+
+  ![Skills Sync](docs/images/skills-sync.png)
+
 - **Commands Sync** — Keep custom commands consistent across all AI assistants
+
+  ![Commands Sync](docs/images/slash-commands-sync.png)
+
 - **Visual Editor** — Built-in Monaco editor for editing rules and configs directly
+- **ClaudeCode Quick Config** — One-click bypass Plugin login, quickly edit settings.json and .claude.json
+
+  ![ClaudeCode Quick Settings](docs/images/claude-code-quick-settings.png)
+
 - **Extensible** — Add custom AI tools via configuration
 
 ## Supported Tools
