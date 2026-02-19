@@ -1,6 +1,7 @@
 import type { AiTool, McpServerWithStatus } from './types';
 import { Avatar, Button, Card, Popconfirm, Switch } from 'antd';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAiTools } from '@/hooks/useAiTools';
 
 interface McpServerCardProps {
@@ -16,6 +17,7 @@ const McpServerCard = memo<McpServerCardProps>(({
   onDelete,
   onToggleTool,
 }) => {
+  const { t } = useTranslation();
   const { mcpTools } = useAiTools();
 
   return (
@@ -24,15 +26,15 @@ const McpServerCard = memo<McpServerCardProps>(({
       hoverable
       extra={(
         <div className="flex gap-2">
-          <Button size="small" onClick={() => onEdit(server)}>编辑</Button>
+          <Button size="small" onClick={() => onEdit(server)}>{t('mcpSync.card.editButton')}</Button>
           <Popconfirm
-            title="确认删除"
-            description={`确定要删除 ${server.name} 吗？将从所有工具中移除。`}
+            title={t('mcpSync.card.confirmDeleteTitle')}
+            description={t('mcpSync.card.confirmDeleteDescription', { serverName: server.name })}
             onConfirm={() => void onDelete(server.name)}
-            okText="确定"
-            cancelText="取消"
+            okText={t('common.confirm')}
+            cancelText={t('common.cancel')}
           >
-            <Button size="small" danger>删除</Button>
+            <Button size="small" danger>{t('mcpSync.card.deleteButton')}</Button>
           </Popconfirm>
         </div>
       )}

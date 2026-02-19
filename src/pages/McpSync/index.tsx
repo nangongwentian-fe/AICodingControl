@@ -3,6 +3,7 @@ import type { AiToolWithLogo } from '@/hooks/useAiTools';
 import { Button, Empty, message, Spin } from 'antd';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import * as TOML from 'smol-toml';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath } from '@/utils/path';
@@ -13,6 +14,7 @@ import McpServerModal from './McpServerModal';
 const MCP_FILE = 'mcp.json';
 
 const McpSync = memo(() => {
+  const { t } = useTranslation();
   const [mcpServers, setMcpServers] = useState<McpServerWithStatus[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<McpServerWithStatus | null>(null);
@@ -188,9 +190,13 @@ const McpSync = memo(() => {
       // 写入工具配置
       await writeToolConfig(tool, serversForTool);
 
-      message.success(enabled ? `已添加到 ${tool.name}` : `已从 ${tool.name} 移除`);
+      message.success(
+        enabled
+          ? t('mcpSync.addedTo', { toolName: tool.name })
+          : t('mcpSync.removedFrom', { toolName: tool.name }),
+      );
     } catch (error) {
-      message.error(`操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      message.error(t('mcpSync.actionFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
       // 回滚状态
       setMcpServers((prev) => {
         return prev.map((s) => {
@@ -204,7 +210,7 @@ const McpSync = memo(() => {
         });
       });
     }
-  }, [mcpServers, mcpTools, writeToolConfig]);
+  }, [mcpServers, mcpTools, t, writeToolConfig]);
 
   // 使用 ref 存储函数引用，避免 useEffect 依赖问题
   const loadAllMcpServersRef = useRef(loadAllMcpServers);
@@ -263,9 +269,9 @@ const McpSync = memo(() => {
         return newServers;
       });
 
-      message.success('删除成功');
+      message.success(t('mcpSync.deleteSuccess'));
     } catch (error) {
-      message.error(`删除失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      message.error(t('mcpSync.deleteFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
     }
   };
 
@@ -312,25 +318,25 @@ const McpSync = memo(() => {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-medium">MCP 列表</h2>
+        <h2 className="text-lg font-medium">{t('mcpSync.title')}</h2>
         <div className="flex gap-2">
           <Button icon={<ReloadOutlined />} onClick={() => void loadAllMcpServers()} loading={isLoading}>
-            刷新
+            {t('common.refresh')}
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            新增 MCP
+            {t('mcpSync.addMcp')}
           </Button>
         </div>
       </div>
 
       {isLoading && mcpServers.length === 0 ? (
         <div className="flex justify-center py-16">
-          <Spin tip="加载中...">
+          <Spin tip={t('common.loading')}>
             <div className="p-12" />
           </Spin>
         </div>
       ) : mcpServers.length === 0 ? (
-        <Empty description="暂无 MCP 配置" />
+        <Empty description={t('mcpSync.empty')} />
       ) : (
         <div className="grid grid-cols-3 gap-4">
           {mcpServers.map(server => (

@@ -3,6 +3,7 @@ import type { SkillItem, SkillTool } from './types';
 import { Avatar, Button, Card, message, Modal, Select, Switch } from 'antd';
 import { memo, useCallback } from 'react';
 import { FolderOpenOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { expandPath, joinPath } from '@/utils/path';
 
 export interface SkillCardProps {
@@ -12,20 +13,22 @@ export interface SkillCardProps {
 }
 
 function SkillCard({ skill, tools, onToggleTool }: SkillCardProps): JSX.Element {
+  const { t } = useTranslation();
+
   const openSkillFolderByTool = useCallback(async (tool: SkillTool): Promise<void> => {
     const toolRoot = await expandPath(tool.skillsPath);
     const skillPath = joinPath(toolRoot, skill.name);
     const result = await window.electronAPI.openPath(skillPath);
     if (!result.success) {
-      message.error(`打开失败: ${result.error ?? '未知错误'}`);
+      message.error(t('skillsSync.openFailed', { error: result.error ?? t('common.unknownError') }));
     }
-  }, [skill.name]);
+  }, [skill.name, t]);
 
   const handleOpenFolder = useCallback(async () => {
     const enabledTools = tools.filter((tool) => Boolean(skill.toolStatus[tool.id as AiToolId]));
 
     if (enabledTools.length === 0) {
-      message.warning('该 Skill 尚未在任何工具中启用');
+      message.warning(t('skillsSync.notEnabledAnyTool'));
       return;
     }
 
@@ -37,12 +40,12 @@ function SkillCard({ skill, tools, onToggleTool }: SkillCardProps): JSX.Element 
     let selectedToolId = enabledTools[0].id as AiToolId;
 
     Modal.confirm({
-      title: '选择要打开的工具',
-      okText: '打开',
-      cancelText: '取消',
+      title: t('skillsSync.selectToolToOpenTitle'),
+      okText: t('common.open'),
+      cancelText: t('common.cancel'),
       content: (
         <div className="mt-2">
-          <p className="mb-2 text-[13px] text-gray-500">该 Skill 在多个工具中启用，请选择要打开的路径：</p>
+          <p className="mb-2 text-[13px] text-gray-500">{t('skillsSync.selectToolToOpenDescription')}</p>
           <Select
             className="w-full"
             defaultValue={selectedToolId}
@@ -59,13 +62,13 @@ function SkillCard({ skill, tools, onToggleTool }: SkillCardProps): JSX.Element 
       onOk: async () => {
         const selectedTool = enabledTools.find((tool) => tool.id === selectedToolId);
         if (!selectedTool) {
-          message.error('未找到要打开的工具');
+          message.error(t('skillsSync.toolNotFoundToOpen'));
           return;
         }
         await openSkillFolderByTool(selectedTool);
       },
     });
-  }, [openSkillFolderByTool, skill.toolStatus, tools]);
+  }, [openSkillFolderByTool, skill.toolStatus, t, tools]);
 
   return (
     <Card

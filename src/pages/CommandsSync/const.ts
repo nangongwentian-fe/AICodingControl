@@ -6,6 +6,3 @@ export const CENTRAL_COMMANDS_PATH = '~/.ai-coding-control/commands';
 
 /** 拖拽区域接受的命令文件扩展名 */
 export const ACCEPTED_COMMAND_EXTENSIONS = ['.md'];
-
-/** 拖拽区域的提示文字 */
-export const DRAG_AREA_MESSAGE = '拖拽 .md 文件到此处，或点击选择文件';

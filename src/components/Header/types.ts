@@ -21,7 +21,7 @@ export interface PageMenuIconImage {
 export type PageMenuIcon = PageMenuIconAntd | PageMenuIconIconify | PageMenuIconImage;
 
 export interface PageMenuOption {
-  label: string;
+  labelKey: string;
   value: PageMenuValue;
   icon?: PageMenuIcon;
 }

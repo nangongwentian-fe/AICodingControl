@@ -2,6 +2,7 @@ import type { McpServerConfig, McpServerWithStatus } from './types';
 import { Button, Form, Input, Modal, Radio, Select, Space } from 'antd';
 import { memo, useEffect } from 'react';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { COMMAND_OPTIONS, CONFIG_TYPE_OPTIONS } from './const';
 import { isHttpConfig, isStdioConfig } from './adapters';
 
@@ -13,6 +14,7 @@ export interface McpServerModalProps {
 }
 
 const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, onCancel }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
 
   // 当 editingServer 变化时，设置表单值
@@ -76,26 +78,26 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
 
   return (
     <Modal
-      title={editingServer ? '编辑 MCP' : '新增 MCP'}
+      title={editingServer ? t('mcpSync.modal.editTitle') : t('mcpSync.modal.addTitle')}
       open={open}
       onOk={() => void handleOk()}
       onCancel={onCancel}
-      okText="确定"
-      cancelText="取消"
+      okText={t('common.confirm')}
+      cancelText={t('common.cancel')}
       width={560}
     >
       <Form form={form} layout="vertical" initialValues={{ configType: 'stdio', args: [], env: [], headers: [] }}>
         <Form.Item
           name="name"
-          label="名称"
-          rules={[{ required: true, message: '请输入 MCP 名称' }]}
+          label={t('mcpSync.modal.nameLabel')}
+          rules={[{ required: true, message: t('mcpSync.modal.nameRequired') }]}
         >
-          <Input placeholder="例如：filesystem" disabled={!!editingServer} />
+          <Input placeholder={t('mcpSync.modal.namePlaceholder')} disabled={!!editingServer} />
         </Form.Item>
 
         <Form.Item
           name="configType"
-          label="类型"
+          label={t('mcpSync.modal.typeLabel')}
           rules={[{ required: true }]}
         >
           <Radio.Group options={CONFIG_TYPE_OPTIONS} />
@@ -110,35 +112,35 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
                 <>
                   <Form.Item
                     name="command"
-                    label="命令"
-                    rules={[{ required: true, message: '请选择命令' }]}
+                    label={t('mcpSync.modal.commandLabel')}
+                    rules={[{ required: true, message: t('mcpSync.modal.commandRequired') }]}
                   >
-                    <Select options={COMMAND_OPTIONS} placeholder="选择命令" />
+                    <Select options={COMMAND_OPTIONS} placeholder={t('mcpSync.modal.commandPlaceholder')} />
                   </Form.Item>
 
-                  <Form.Item label="参数" required>
+                  <Form.Item label={t('mcpSync.modal.argsLabel')} required>
                     {getFieldValue('configType') === 'stdio' && (
                       <Form.List name="args">
                         {(fields, { add, remove }) => (
                           <>
                             {fields.map((field) => {
-                              const { key: _, ...restField } = field;
+                              const { key, ...restField } = field;
                               return (
-                                <Space key={field.key} align="baseline" className="mb-2 flex">
+                                <Space key={key} align="baseline" className="mb-2 flex">
                                   <Form.Item
                                     {...restField}
                                     name={[field.name, 'value']}
-                                    rules={[{ required: true, message: '请输入参数' }]}
+                                    rules={[{ required: true, message: t('mcpSync.modal.argRequired') }]}
                                     className="mb-0 flex-1"
                                   >
-                                    <Input placeholder="参数值" />
+                                    <Input placeholder={t('mcpSync.modal.argPlaceholder')} />
                                   </Form.Item>
                                   <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
                                 </Space>
                               );
                             })}
                             <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                              添加参数
+                              {t('mcpSync.modal.addArg')}
                             </Button>
                           </>
                         )}
@@ -146,21 +148,21 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
                     )}
                   </Form.Item>
 
-                  <Form.Item label="环境变量">
+                  <Form.Item label={t('mcpSync.modal.envLabel')}>
                     {getFieldValue('configType') === 'stdio' && (
                       <Form.List name="env">
                         {(fields, { add, remove }) => (
                           <>
                             {fields.map((field) => {
-                              const { key: _, ...restField } = field;
+                              const { key, ...restField } = field;
                               return (
-                                <Space key={field.key} align="baseline" className="mb-2 flex">
+                                <Space key={key} align="baseline" className="mb-2 flex">
                                   <Form.Item
                                     {...restField}
                                     name={[field.name, 'key']}
                                     className="mb-0"
                                   >
-                                    <Input placeholder="变量名" style={{ width: 140 }} />
+                                    <Input placeholder={t('mcpSync.modal.envKeyPlaceholder')} style={{ width: 140 }} />
                                   </Form.Item>
                                   <span>=</span>
                                   <Form.Item
@@ -168,14 +170,14 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
                                     name={[field.name, 'value']}
                                     className="mb-0 flex-1"
                                   >
-                                    <Input placeholder="变量值" />
+                                    <Input placeholder={t('mcpSync.modal.envValuePlaceholder')} />
                                   </Form.Item>
                                   <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
                                 </Space>
                               );
                             })}
                             <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                              添加环境变量
+                              {t('mcpSync.modal.addEnv')}
                             </Button>
                           </>
                         )}
@@ -191,27 +193,30 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
               <>
                 <Form.Item
                   name="url"
-                  label="URL"
-                  rules={[{ required: true, message: '请输入 URL' }, { type: 'url', message: '请输入有效的 URL' }]}
+                  label={t('mcpSync.modal.urlLabel')}
+                  rules={[
+                    { required: true, message: t('mcpSync.modal.urlRequired') },
+                    { type: 'url', message: t('mcpSync.modal.urlInvalid') },
+                  ]}
                 >
-                  <Input placeholder="https://api.example.com/mcp" />
+                  <Input placeholder={t('mcpSync.modal.urlPlaceholder')} />
                 </Form.Item>
 
-                <Form.Item label="Headers">
+                <Form.Item label={t('mcpSync.modal.headersLabel')}>
                   {getFieldValue('configType') === 'http' && (
                     <Form.List name="headers">
                       {(fields, { add, remove }) => (
                         <>
                           {fields.map((field) => {
-                            const { key: _, ...restField } = field;
+                            const { key, ...restField } = field;
                             return (
-                              <Space key={field.key} align="baseline" className="mb-2 flex">
+                              <Space key={key} align="baseline" className="mb-2 flex">
                                 <Form.Item
                                   {...restField}
                                   name={[field.name, 'key']}
                                   className="mb-0"
                                 >
-                                  <Input placeholder="Header 名" style={{ width: 140 }} />
+                                  <Input placeholder={t('mcpSync.modal.headerKeyPlaceholder')} style={{ width: 140 }} />
                                 </Form.Item>
                                 <span>=</span>
                                 <Form.Item
@@ -219,14 +224,14 @@ const McpServerModal = memo<McpServerModalProps>(({ open, editingServer, onOk, o
                                   name={[field.name, 'value']}
                                   className="mb-0 flex-1"
                                 >
-                                  <Input placeholder="Header 值" />
+                                  <Input placeholder={t('mcpSync.modal.headerValuePlaceholder')} />
                                 </Form.Item>
                                 <MinusCircleOutlined onClick={() => remove(field.name)} className="text-gray-400 hover:text-red-500" />
                               </Space>
                             );
                           })}
                           <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                            添加 Header
+                            {t('mcpSync.modal.addHeader')}
                           </Button>
                         </>
                       )}

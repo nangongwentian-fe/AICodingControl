@@ -7,6 +7,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ReloadOutlined, FolderOutlined, PlusOutlined, FileOutlined, InboxOutlined } from '@ant-design/icons';
 import filter from 'lodash/filter';
 import sortBy from 'lodash/sortBy';
+import { useTranslation } from 'react-i18next';
 import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath, joinPath } from '@/utils/path';
@@ -16,10 +17,10 @@ import {
   CENTRAL_COMMANDS_PATH,
   COMMAND_EDITOR_HEIGHT,
   COMMAND_FILE_EXTENSION,
-  DRAG_AREA_MESSAGE,
 } from './const';
 
 function CommandsSync(): JSX.Element {
+  const { t } = useTranslation();
   const [commands, setCommands] = useState<CommandItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editRequest, setEditRequest] = useState<EditRequest | null>(null);
@@ -89,7 +90,7 @@ function CommandsSync(): JSX.Element {
         .map((item) => item.value);
 
       if (fulfilled.length !== settled.length || !centralDirResult.success) {
-        message.error('部分 Commands 读取失败');
+        message.error(t('commandsSync.partialReadFailed'));
       }
 
       const commandMap = new Map<string, CommandItem>();
@@ -121,7 +122,7 @@ function CommandsSync(): JSX.Element {
     } finally {
       setLoading(false);
     }
-  }, [commandTools, createEmptyToolStatus, filterCommandFiles]);
+  }, [commandTools, createEmptyToolStatus, filterCommandFiles, t]);
 
   const updateCommandStatus = useCallback((commandName: string, toolId: AiToolId, enabled: boolean): void => {
     setCommands((prev) => {
@@ -192,14 +193,14 @@ function CommandsSync(): JSX.Element {
   ): Promise<boolean> => {
     const targetTool = commandTools.find((tool) => tool.id === targetToolId);
     if (!targetTool) {
-      message.error('未找到对应的工具配置');
+      message.error(t('commandsSync.toolConfigNotFound'));
       return false;
     }
 
     const sources = getSourceTools(commandName, targetToolId);
     const centralCommandPath = await ensureCentralCommandFile(commandName, sources);
     if (!centralCommandPath) {
-      message.error('未找到可同步的来源');
+      message.error(t('commandsSync.sourceNotFound'));
       return false;
     }
 
@@ -207,17 +208,17 @@ function CommandsSync(): JSX.Element {
     const targetPath = joinPath(targetRoot, commandName);
     const result = await window.electronAPI.copyFile(centralCommandPath, targetPath);
     if (!result.success) {
-      message.error(`复制到目标工具失败: ${result.error ?? '未知错误'}`);
+      message.error(t('commandsSync.copyTargetFailed', { error: result.error ?? t('common.unknownError') }));
       return false;
     }
 
     return true;
-  }, [commandTools, ensureCentralCommandFile, getSourceTools]);
+  }, [commandTools, ensureCentralCommandFile, getSourceTools, t]);
 
   const removeCommandFromTool = useCallback(async (commandName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = commandTools.find((item) => item.id === toolId);
     if (!tool) {
-      message.error('未找到对应的工具配置');
+      message.error(t('commandsSync.toolConfigNotFound'));
       return false;
     }
 
@@ -226,39 +227,39 @@ function CommandsSync(): JSX.Element {
     const result = await window.electronAPI.removeFile(targetPath);
 
     if (!result.success) {
-      message.error(`移除失败: ${result.error ?? '未知错误'}`);
+      message.error(t('commandsSync.removeFailed', { error: result.error ?? t('common.unknownError') }));
       return false;
     }
 
     return true;
-  }, [commandTools]);
+  }, [commandTools, t]);
 
   const handleEnableCommand = useCallback(async (commandName: string, toolId: AiToolId): Promise<void> => {
-    const targetToolName = commandTools.find((tool) => tool.id === toolId)?.name ?? '目标工具';
+    const targetToolName = commandTools.find((tool) => tool.id === toolId)?.name ?? t('common.targetTool');
 
     updateCommandStatus(commandName, toolId, true);
     const ok = await enableCommandForTool(commandName, toolId);
     if (ok) {
-      message.success(`已同步到 ${targetToolName}`);
+      message.success(t('commandsSync.syncSuccess', { toolName: targetToolName }));
     } else {
       updateCommandStatus(commandName, toolId, false);
     }
-  }, [commandTools, enableCommandForTool, updateCommandStatus]);
+  }, [commandTools, enableCommandForTool, t, updateCommandStatus]);
 
   const handleDisableCommand = useCallback((commandName: string, toolId: AiToolId): void => {
     const targetTool = commandTools.find((tool) => tool.id === toolId);
-    const targetName = targetTool?.name ?? '目标工具';
+    const targetName = targetTool?.name ?? t('common.targetTool');
 
     Modal.confirm({
-      title: '确认移除',
-      content: `确定要从 ${targetName} 移除 ${commandName} 吗？`,
-      okText: '移除',
-      cancelText: '取消',
+      title: t('commandsSync.confirmRemoveTitle'),
+      content: t('commandsSync.confirmRemoveContent', { targetName, commandName }),
+      okText: t('common.remove'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         const allSources = getAllSourceTools(commandName);
         const centralCommandPath = await ensureCentralCommandFile(commandName, allSources);
         if (!centralCommandPath) {
-          message.error('移除前未找到可备份的 command 文件，已取消操作');
+          message.error(t('commandsSync.removeBackupNotFound'));
           return;
         }
 
@@ -266,7 +267,7 @@ function CommandsSync(): JSX.Element {
         if (ok) {
           updateCommandStatus(commandName, toolId, false);
           await loadAllCommands();
-          message.success(`已从 ${targetName} 移除`);
+          message.success(t('commandsSync.removeSuccess', { targetName }));
         }
       },
     });
@@ -276,6 +277,7 @@ function CommandsSync(): JSX.Element {
     getAllSourceTools,
     loadAllCommands,
     removeCommandFromTool,
+    t,
     updateCommandStatus,
   ]);
 
@@ -323,7 +325,7 @@ function CommandsSync(): JSX.Element {
         const filePath = await getCentralCommandPath(commandName);
         const writeResult = await window.electronAPI.writeFile(filePath, content);
         if (!writeResult.success) {
-          message.error(`保存失败: ${writeResult.error ?? '未知错误'}`);
+          message.error(t('commandsSync.saveFailed', { error: writeResult.error ?? t('common.unknownError') }));
           return;
         }
 
@@ -341,11 +343,11 @@ function CommandsSync(): JSX.Element {
 
         const failed = syncResults.find((result) => !result.success);
         if (failed) {
-          message.error(`同步到工具目录失败: ${failed.error ?? '未知错误'}`);
+          message.error(t('commandsSync.syncToToolsFailed', { error: failed.error ?? t('common.unknownError') }));
         }
       })();
     }, 1000),
-    [commandTools, editRequest, getCentralCommandPath],
+    [commandTools, editRequest, getCentralCommandPath, t],
   );
 
   const handleContentChange = useCallback((value: string | undefined) => {
@@ -403,7 +405,7 @@ function CommandsSync(): JSX.Element {
         const centralCommandPath = joinPath(centralRoot, `${commandName}.md`);
         const writeResult = await window.electronAPI.writeFile(centralCommandPath, content);
         if (!writeResult.success) {
-          throw new Error(writeResult.error ?? '中心目录写入失败');
+          throw new Error(writeResult.error ?? t('commandsSync.centralWriteFailed'));
         }
 
         // 复制到每个工具目录
@@ -414,23 +416,23 @@ function CommandsSync(): JSX.Element {
           const targetPath = joinPath(targetRoot, `${commandName}.md`);
           const copyResult = await window.electronAPI.copyFile(centralCommandPath, targetPath);
           if (!copyResult.success) {
-            throw new Error(copyResult.error ?? `复制到 ${tool.name} 失败`);
+            throw new Error(copyResult.error ?? t('commandsSync.copyToToolFailed', { toolName: tool.name }));
           }
         }
       }
 
-      message.success(`成功添加 ${uploadedFiles.length} 个 Command`);
+      message.success(t('commandsSync.addSuccess', { count: uploadedFiles.length }));
       setAddModalOpen(false);
       setUploadedFiles([]);
 
       // 刷新命令列表
       await loadAllCommands();
     } catch (error) {
-      message.error(`添加失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      message.error(t('commandsSync.addFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
     } finally {
       setAddLoading(false);
     }
-  }, [uploadedFiles, commandTools, loadAllCommands]);
+  }, [uploadedFiles, commandTools, loadAllCommands, t]);
 
   /** 关闭添加 Modal 时重置状态 */
   const handleAddModalClose = useCallback((): void => {
@@ -451,7 +453,7 @@ function CommandsSync(): JSX.Element {
       if (!filePath) {
         if (!cancelled) {
           setEditContent('');
-          message.error('读取失败: 未找到可编辑的 command 文件');
+          message.error(t('commandsSync.readNoEditable'));
           setEditLoading(false);
         }
         return;
@@ -462,7 +464,7 @@ function CommandsSync(): JSX.Element {
 
       if (!result.success) {
         setEditContent('');
-        message.error(`读取失败: ${result.error ?? '未知错误'}`);
+        message.error(t('commandsSync.readFailed', { error: result.error ?? t('common.unknownError') }));
       } else {
         setEditContent(result.content ?? '');
       }
@@ -475,7 +477,7 @@ function CommandsSync(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [editModalOpen, editRequest, ensureCentralCommandFile, getAllSourceTools]);
+  }, [editModalOpen, editRequest, ensureCentralCommandFile, getAllSourceTools, t]);
 
   useEffect(() => {
     if (toolsLoading) return;
@@ -496,15 +498,15 @@ function CommandsSync(): JSX.Element {
   if (isLoading && commands.length === 0) {
     content = (
       <div className="flex justify-center py-16">
-        <Spin tip="加载中...">
+        <Spin tip={t('common.loading')}>
           <div className="p-12" />
         </Spin>
       </div>
     );
   } else if (commandTools.length === 0) {
-    content = <Empty description="暂无支持 Commands 的工具" />;
+    content = <Empty description={t('commandsSync.emptyUnsupportedTools')} />;
   } else if (commands.length === 0) {
-    content = <Empty description="暂无 Commands" />;
+    content = <Empty description={t('commandsSync.emptyNoCommands')} />;
   } else {
     content = (
       <div className="grid grid-cols-3 gap-4">
@@ -524,16 +526,16 @@ function CommandsSync(): JSX.Element {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-medium">Commands 列表</h2>
+        <h2 className="text-lg font-medium">{t('commandsSync.title')}</h2>
         <div className="flex gap-2">
           <Button icon={<FolderOutlined />} onClick={() => void handleOpenFolder()}>
-            打开 Commands 文件夹
+            {t('commandsSync.openFolder')}
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
-            添加 Command
+            {t('commandsSync.addCommand')}
           </Button>
           <Button icon={<ReloadOutlined />} onClick={() => void loadAllCommands()} loading={isLoading}>
-            刷新
+            {t('common.refresh')}
           </Button>
         </div>
       </div>
@@ -541,7 +543,11 @@ function CommandsSync(): JSX.Element {
       {content}
 
       <Modal
-        title={editRequest ? `编辑 ${editRequest.commandName}` : '编辑 Command'}
+        title={
+          editRequest
+            ? t('commandsSync.editModalTitle', { commandName: editRequest.commandName })
+            : t('commandsSync.editModalTitleDefault')
+        }
         open={editModalOpen}
         onCancel={handleEditCancel}
         footer={null}
@@ -569,7 +575,7 @@ function CommandsSync(): JSX.Element {
       </Modal>
 
       <Modal
-        title="添加 Command"
+        title={t('commandsSync.addModalTitle')}
         open={addModalOpen}
         onCancel={handleAddModalClose}
         footer={null}
@@ -588,13 +594,13 @@ function CommandsSync(): JSX.Element {
         >
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors">
             <InboxOutlined className="text-4xl text-gray-400 mb-2" />
-            <p className="text-gray-600">{DRAG_AREA_MESSAGE}</p>
+            <p className="text-gray-600">{t('commandsSync.dragAreaMessage')}</p>
           </div>
         </Upload>
 
         {uploadedFiles.length > 0 && (
           <div className="mt-4">
-            <h4 className="font-medium mb-2">已选择 {uploadedFiles.length} 个文件：</h4>
+            <h4 className="font-medium mb-2">{t('commandsSync.selectedFiles', { count: uploadedFiles.length })}</h4>
             <ul className="space-y-1">
               {uploadedFiles.map((file) => (
                 <li key={file.name} className="flex items-center gap-2 text-sm">
@@ -608,7 +614,7 @@ function CommandsSync(): JSX.Element {
 
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={handleAddModalClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             type="primary"
@@ -616,7 +622,7 @@ function CommandsSync(): JSX.Element {
             disabled={uploadedFiles.length === 0}
             onClick={() => void handleAddCommands()}
           >
-            确认添加
+            {t('commandsSync.confirmAdd')}
           </Button>
         </div>
       </Modal>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AiToolConfig, AiToolsConfig } from '@/types/ai-tools';
+import i18n from '@/i18n';
 
 import antigravityLogo from '@/assets/images/antigravity.png';
 import claudeCodeLogo from '@/assets/images/claude_code.svg';
@@ -38,10 +39,10 @@ export function useAiTools() {
           }));
           setTools(toolsWithLogo);
         } else {
-          setError(result.error || '加载失败');
+          setError(result.error || i18n.t('common.loadFailed'));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : '未知错误');
+        setError(err instanceof Error ? err.message : i18n.t('common.unknownError'));
       } finally {
         setLoading(false);
       }

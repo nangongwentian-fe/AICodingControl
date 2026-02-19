@@ -1,6 +1,7 @@
 import type { AntdIconName, PageMenuIcon, PageMenuValue } from './types';
 import { Segmented } from 'antd';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
 import { Icon } from '@iconify/react';
 import {
@@ -47,6 +48,7 @@ const renderIconNode = (icon?: PageMenuIcon): React.ReactNode => {
 };
 
 const PageMenu = memo(() => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -61,20 +63,21 @@ const PageMenu = memo(() => {
     () =>
       PAGE_MENU_OPTIONS.map((option) => {
         const iconNode = renderIconNode(option.icon);
+        const translatedLabel = t(option.labelKey);
 
         return {
           value: option.value,
           label: iconNode ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {iconNode}
-              <span>{option.label}</span>
+              <span>{translatedLabel}</span>
             </div>
           ) : (
-            option.label
+            translatedLabel
           ),
         };
       }),
-    []
+    [t]
   );
 
   return <Segmented options={options} value={currentPage} onChange={handleChange} />;

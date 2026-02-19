@@ -1,6 +1,7 @@
 import type { AiToolWithLogo } from '@/hooks/useAiTools';
 import { Avatar, Button, Card, message, Modal, Popconfirm, Space, Spin } from 'antd';
 import { memo, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath } from '@/utils/path';
@@ -8,6 +9,7 @@ import { expandPath } from '@/utils/path';
 const AGENTS_FILE = 'AGENTS.md';
 
 const RuleSync = memo(() => {
+  const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [filePath, setFilePath] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -42,10 +44,10 @@ const RuleSync = memo(() => {
     const fullPath = await expandPath(tool.ruleTargetPath);
     const result = await window.electronAPI.writeFile(fullPath, code);
     if (result.success) {
-      message.success(`已同步到 ${tool.name}`);
+      message.success(t('ruleSync.syncSuccess', { toolName: tool.name }));
     }
     else {
-      message.error(`同步失败: ${result.error}`);
+      message.error(t('ruleSync.syncFailed', { error: result.error ?? t('common.unknownError') }));
     }
   };
 
@@ -70,7 +72,7 @@ const RuleSync = memo(() => {
   if (toolsLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Spin tip="加载中...">
+        <Spin tip={t('common.loading')}>
           <div className="p-12" />
         </Spin>
       </div>
@@ -94,21 +96,25 @@ const RuleSync = memo(() => {
           >
             <Space>
               <Popconfirm
-                title="确认同步"
-                description={`确定要同步到 ${tool.name} 吗？`}
+                title={t('ruleSync.confirmSyncTitle')}
+                description={t('ruleSync.confirmSyncDescription', { toolName: tool.name })}
                 onConfirm={() => void handleSync(tool)}
-                okText="确定"
-                cancelText="取消"
+                okText={t('common.confirm')}
+                cancelText={t('common.cancel')}
               >
-                <Button type="primary">同步</Button>
+                <Button type="primary">{t('ruleSync.syncButton')}</Button>
               </Popconfirm>
-              <Button onClick={() => void handleView(tool)}>查看</Button>
+              <Button onClick={() => void handleView(tool)}>{t('ruleSync.viewButton')}</Button>
             </Space>
           </Card>
         ))}
       </div>
       <Modal
-        title={viewingTool ? `${viewingTool.name} Rule 文件` : '查看 Rule 文件'}
+        title={
+          viewingTool
+            ? t('ruleSync.viewModalTitle', { toolName: viewingTool.name })
+            : t('ruleSync.viewModalTitleDefault')
+        }
         open={viewModalOpen}
         onCancel={() => setViewModalOpen(false)}
         footer={null}

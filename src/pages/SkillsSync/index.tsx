@@ -7,12 +7,14 @@ import compact from 'lodash/compact';
 import keyBy from 'lodash/keyBy';
 import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
+import { useTranslation } from 'react-i18next';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath, joinPath } from '@/utils/path';
 import SkillCard from './SkillCard';
 import { SKILL_DEFINITION_FILE } from './const';
 
 function SkillsSync(): JSX.Element {
+  const { t } = useTranslation();
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -80,7 +82,7 @@ function SkillsSync(): JSX.Element {
       .map((item) => item.value);
 
     if (fulfilled.length !== settled.length) {
-      message.error('部分 Skills 读取失败');
+      message.error(t('skillsSync.partialReadFailed'));
     }
 
     const skillMap = new Map<string, SkillItem>();
@@ -101,7 +103,7 @@ function SkillsSync(): JSX.Element {
     const mergedSkills = sortBy(Array.from(skillMap.values()), (skill) => skill.name.toLowerCase());
     setSkills(mergedSkills);
     setLoading(false);
-  }, [createEmptyToolStatus, filterSkillFolders, skillTools]);
+  }, [createEmptyToolStatus, filterSkillFolders, skillTools, t]);
 
   const updateSkillStatus = useCallback((skillName: string, toolId: AiToolId, enabled: boolean): void => {
     setSkills((prev) => {
@@ -140,14 +142,14 @@ function SkillsSync(): JSX.Element {
   ): Promise<boolean> => {
     const targetTool = skillTools.find((tool) => tool.id === targetToolId);
     if (!targetTool) {
-      message.error('未找到对应的工具配置');
+      message.error(t('skillsSync.toolConfigNotFound'));
       return false;
     }
 
     // 从已有的源工具复制
     const sources = getSourceTools(skillName, targetToolId);
     if (sources.length === 0) {
-      message.error('未找到可同步的来源');
+      message.error(t('skillsSync.sourceNotFound'));
       return false;
     }
 
@@ -159,17 +161,17 @@ function SkillsSync(): JSX.Element {
     // 复制到目标工具目录
     const copyResult = await window.electronAPI.copyDir(sourcePath, targetPath);
     if (!copyResult.success) {
-      message.error(`复制失败: ${copyResult.error ?? '未知错误'}`);
+      message.error(t('skillsSync.copyFailed', { error: copyResult.error ?? t('common.unknownError') }));
       return false;
     }
 
     return true;
-  }, [getSourceTools, skillTools]);
+  }, [getSourceTools, skillTools, t]);
 
   const removeSkillFromTool = useCallback(async (skillName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = skillTools.find((item) => item.id === toolId);
     if (!tool) {
-      message.error('未找到对应的工具配置');
+      message.error(t('skillsSync.toolConfigNotFound'));
       return false;
     }
 
@@ -178,43 +180,43 @@ function SkillsSync(): JSX.Element {
     const result = await window.electronAPI.removeDir(targetPath);
 
     if (!result.success) {
-      message.error(`移除失败: ${result.error ?? '未知错误'}`);
+      message.error(t('skillsSync.removeFailed', { error: result.error ?? t('common.unknownError') }));
       return false;
     }
 
     return true;
-  }, [skillTools]);
+  }, [skillTools, t]);
 
   const handleEnableSkill = useCallback(async (skillName: string, toolId: AiToolId): Promise<void> => {
-    const targetToolName = skillTools.find((tool) => tool.id === toolId)?.name ?? '目标工具';
+    const targetToolName = skillTools.find((tool) => tool.id === toolId)?.name ?? t('common.targetTool');
 
     updateSkillStatus(skillName, toolId, true);
     const ok = await enableSkillForTool(skillName, toolId);
     if (ok) {
-      message.success(`已同步到 ${targetToolName}`);
+      message.success(t('skillsSync.syncSuccess', { toolName: targetToolName }));
     } else {
       updateSkillStatus(skillName, toolId, false);
     }
-  }, [enableSkillForTool, skillTools, updateSkillStatus]);
+  }, [enableSkillForTool, skillTools, t, updateSkillStatus]);
 
   const handleDisableSkill = useCallback((skillName: string, toolId: AiToolId): void => {
     const targetTool = skillTools.find((tool) => tool.id === toolId);
-    const targetName = targetTool?.name ?? '目标工具';
+    const targetName = targetTool?.name ?? t('common.targetTool');
 
     Modal.confirm({
-      title: '确认移除',
-      content: `确定要从 ${targetName} 移除 ${skillName} 吗？`,
-      okText: '移除',
-      cancelText: '取消',
+      title: t('skillsSync.confirmRemoveTitle'),
+      content: t('skillsSync.confirmRemoveContent', { targetName, skillName }),
+      okText: t('common.remove'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         const ok = await removeSkillFromTool(skillName, toolId);
         if (ok) {
           updateSkillStatus(skillName, toolId, false);
-          message.success(`已从 ${targetName} 移除`);
+          message.success(t('skillsSync.removeSuccess', { targetName }));
         }
       },
     });
-  }, [removeSkillFromTool, skillTools, updateSkillStatus]);
+  }, [removeSkillFromTool, skillTools, t, updateSkillStatus]);
 
   const handleToggleTool = useCallback(async (skillName: string, toolId: AiToolId, enabled: boolean): Promise<void> => {
     if (enabled) {
@@ -244,15 +246,15 @@ function SkillsSync(): JSX.Element {
   if (isLoading && skills.length === 0) {
     content = (
       <div className="flex justify-center py-16">
-        <Spin tip="加载中...">
+        <Spin tip={t('common.loading')}>
           <div className="p-12" />
         </Spin>
       </div>
     );
   } else if (skillTools.length === 0) {
-    content = <Empty description="暂无支持 Skills 的工具" />;
+    content = <Empty description={t('skillsSync.emptyUnsupportedTools')} />;
   } else if (skills.length === 0) {
-    content = <Empty description="暂无 Skills" />;
+    content = <Empty description={t('skillsSync.emptyNoSkills')} />;
   } else {
     content = (
       <div className="grid grid-cols-3 gap-4">
@@ -271,16 +273,16 @@ function SkillsSync(): JSX.Element {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-medium">Skills 列表</h2>
+        <h2 className="text-lg font-medium">{t('skillsSync.title')}</h2>
         <div className="flex gap-2">
           <Button icon={<ReloadOutlined />} onClick={() => void loadAllSkills()} loading={isLoading}>
-            刷新
+            {t('common.refresh')}
           </Button>
           <Button
             type="primary"
             onClick={() => window.electronAPI.openExternal('https://skills.sh/')}
           >
-            安装Skills
+            {t('skillsSync.installSkills')}
           </Button>
         </div>
       </div>

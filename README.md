@@ -104,6 +104,21 @@ pnpm run build:react
 pnpm run build:electron
 ```
 
+### macOS dmg 安装后启动提示
+
+通过 `.dmg` 安装后，如果直接打开提示“软件已损坏”，通常是因为应用未经过 Apple 发布签名。可按以下步骤允许运行：
+
+1. 打开 Terminal，输入以下命令（先不要回车）：
+
+```bash
+sudo xattr -rd com.apple.quarantine
+```
+
+2. 将应用程序拖入命令行（会自动补全应用路径），按回车执行。
+3. 输入本机密码完成授权，随后即可正常启动应用。
+
+![macOS dmg 启动提示](docs/images/start-tip.jpg)
+
 ## 项目结构
 
 ```

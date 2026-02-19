@@ -1,6 +1,7 @@
 import { Button, message, Modal, Tooltip } from 'antd'
 import CodeEditor from '@/components/CodeEditor'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { expandPath } from '@/utils/path'
 import { createDebouncedFileWriter } from '@/utils/file'
 import { CLAUDE_CONFIG_CONTENT, CLAUDE_CONFIG_PATH, CLAUDE_JSON_PATH, CLAUDE_SETTINGS_PATH } from './const'
@@ -8,6 +9,7 @@ import { CLAUDE_CONFIG_CONTENT, CLAUDE_CONFIG_PATH, CLAUDE_JSON_PATH, CLAUDE_SET
 type BypassStatus = 'checking' | 'bypassed' | 'not_bypassed'
 
 const ClaudeCode = memo(() => {
+  const { t } = useTranslation()
   const [status, setStatus] = useState<BypassStatus>('checking')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [configFullPath, setConfigFullPath] = useState<string>(CLAUDE_CONFIG_PATH)
@@ -60,14 +62,14 @@ const ClaudeCode = memo(() => {
 
       if (result.success) {
         setStatus('bypassed')
-        message.success('已成功绕过Plugin登陆')
+        message.success(t('claudeCode.bypassSuccess'))
       } else {
-        message.error('创建配置文件失败')
+        message.error(t('claudeCode.createConfigFailed'))
       }
     } catch {
-      message.error('创建配置文件失败')
+      message.error(t('claudeCode.createConfigFailed'))
     }
-  }, [status])
+  }, [status, t])
 
   // 关闭 Modal
   const handleCloseModal = useCallback(() => {
@@ -160,11 +162,11 @@ const ClaudeCode = memo(() => {
   }, [checkBypassStatus])
 
   const isBypassed = status === 'bypassed'
-  const buttonText = isBypassed ? '已绕过Plugin登陆' : '一键绕过Plugin登陆'
+  const buttonText = isBypassed ? t('claudeCode.buttonBypassed') : t('claudeCode.buttonBypass')
 
   return (
     <div className="flex gap-2">
-      <Tooltip title="通过创建~/.claude/config.json绕过Plugin登陆" placement="bottomRight">
+      <Tooltip title={t('claudeCode.tooltipBypass')} placement="bottomRight">
         <Button
           type={isBypassed ? 'primary' : 'default'}
           style={isBypassed ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
@@ -175,15 +177,15 @@ const ClaudeCode = memo(() => {
         </Button>
       </Tooltip>
 
-      <Tooltip title="编辑 ~/.claude/settings.json" placement="bottomRight">
+      <Tooltip title={t('claudeCode.tooltipSettings')} placement="bottomRight">
         <Button onClick={handleOpenSettings}>
-          打开settings.json
+          {t('claudeCode.openSettings')}
         </Button>
       </Tooltip>
 
-      <Tooltip title="编辑 ~/.claude.json" placement="bottomRight">
+      <Tooltip title={t('claudeCode.tooltipClaudeJson')} placement="bottomRight">
         <Button onClick={handleOpenClaudeJson}>
-          打开.claude.json
+          {t('claudeCode.openClaudeJson')}
         </Button>
       </Tooltip>
 

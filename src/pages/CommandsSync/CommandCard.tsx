@@ -2,6 +2,7 @@ import type { AiToolId } from '@/types/ai-tools';
 import type { CommandItem, CommandTool } from './types';
 import { Avatar, Button, Card, Switch } from 'antd';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface CommandCardProps {
   command: CommandItem;
@@ -11,12 +12,13 @@ export interface CommandCardProps {
 }
 
 function CommandCard({ command, tools, onToggleTool, onEditCommand }: CommandCardProps): JSX.Element {
+  const { t } = useTranslation();
   return (
     <Card
       title={command.name}
       extra={(
         <Button size="small" onClick={() => onEditCommand(command.name)}>
-          编辑
+          {t('common.edit')}
         </Button>
       )}
       hoverable
