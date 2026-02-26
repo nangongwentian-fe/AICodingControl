@@ -10,5 +10,8 @@
     "typescript",
     "typescriptreact"
   ],
-  "eslint.useFlatConfig": true
+  "eslint.useFlatConfig": true,
+  "i18n-ally.localesPaths": [
+    "src/i18n"
+  ]
 }
