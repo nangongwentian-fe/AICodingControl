@@ -1,13 +1,32 @@
 import type { AiToolId } from '@/types/ai-tools';
 import type { CommandItem, CommandTool, CommandToolStatus, EditRequest, UploadedFile } from './types';
-import { Button, Empty, message, Modal, Spin, Upload } from 'antd';
-import type { RcFile } from 'antd/es/upload';
+import { toast } from 'sonner';
+import { Icon } from '@iconify/react';
 import debounce from 'lodash/debounce';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ReloadOutlined, FolderOutlined, PlusOutlined, FileOutlined, InboxOutlined } from '@ant-design/icons';
 import filter from 'lodash/filter';
 import sortBy from 'lodash/sortBy';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FileUpload } from '@/components/ui/file-upload';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import CodeEditor from '@/components/CodeEditor';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath, joinPath } from '@/utils/path';
@@ -32,6 +51,13 @@ function CommandsSync(): JSX.Element {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [addLoading, setAddLoading] = useState(false);
+
+  // 删除确认对话框状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    commandName: string;
+    toolId: AiToolId;
+    targetName: string;
+  } | null>(null);
 
   const { tools, loading: toolsLoading } = useAiTools();
 
@@ -90,7 +116,7 @@ function CommandsSync(): JSX.Element {
         .map((item) => item.value);
 
       if (fulfilled.length !== settled.length || !centralDirResult.success) {
-        message.error(t('commandsSync.partialReadFailed'));
+        toast.error(t('commandsSync.partialReadFailed'));
       }
 
       const commandMap = new Map<string, CommandItem>();
@@ -193,14 +219,14 @@ function CommandsSync(): JSX.Element {
   ): Promise<boolean> => {
     const targetTool = commandTools.find((tool) => tool.id === targetToolId);
     if (!targetTool) {
-      message.error(t('commandsSync.toolConfigNotFound'));
+      toast.error(t('commandsSync.toolConfigNotFound'));
       return false;
     }
 
     const sources = getSourceTools(commandName, targetToolId);
     const centralCommandPath = await ensureCentralCommandFile(commandName, sources);
     if (!centralCommandPath) {
-      message.error(t('commandsSync.sourceNotFound'));
+      toast.error(t('commandsSync.sourceNotFound'));
       return false;
     }
 
@@ -208,7 +234,7 @@ function CommandsSync(): JSX.Element {
     const targetPath = joinPath(targetRoot, commandName);
     const result = await window.electronAPI.copyFile(centralCommandPath, targetPath);
     if (!result.success) {
-      message.error(t('commandsSync.copyTargetFailed', { error: result.error ?? t('common.unknownError') }));
+      toast.error(t('commandsSync.copyTargetFailed', { error: result.error ?? t('common.unknownError') }));
       return false;
     }
 
@@ -218,7 +244,7 @@ function CommandsSync(): JSX.Element {
   const removeCommandFromTool = useCallback(async (commandName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = commandTools.find((item) => item.id === toolId);
     if (!tool) {
-      message.error(t('commandsSync.toolConfigNotFound'));
+      toast.error(t('commandsSync.toolConfigNotFound'));
       return false;
     }
 
@@ -227,7 +253,7 @@ function CommandsSync(): JSX.Element {
     const result = await window.electronAPI.removeFile(targetPath);
 
     if (!result.success) {
-      message.error(t('commandsSync.removeFailed', { error: result.error ?? t('common.unknownError') }));
+      toast.error(t('commandsSync.removeFailed', { error: result.error ?? t('common.unknownError') }));
       return false;
     }
 
@@ -240,7 +266,7 @@ function CommandsSync(): JSX.Element {
     updateCommandStatus(commandName, toolId, true);
     const ok = await enableCommandForTool(commandName, toolId);
     if (ok) {
-      message.success(t('commandsSync.syncSuccess', { toolName: targetToolName }));
+      toast.success(t('commandsSync.syncSuccess', { toolName: targetToolName }));
     } else {
       updateCommandStatus(commandName, toolId, false);
     }
@@ -249,37 +275,29 @@ function CommandsSync(): JSX.Element {
   const handleDisableCommand = useCallback((commandName: string, toolId: AiToolId): void => {
     const targetTool = commandTools.find((tool) => tool.id === toolId);
     const targetName = targetTool?.name ?? t('common.targetTool');
+    setConfirmDialog({ commandName, toolId, targetName });
+  }, [commandTools, t]);
 
-    Modal.confirm({
-      title: t('commandsSync.confirmRemoveTitle'),
-      content: t('commandsSync.confirmRemoveContent', { targetName, commandName }),
-      okText: t('common.remove'),
-      cancelText: t('common.cancel'),
-      onOk: async () => {
-        const allSources = getAllSourceTools(commandName);
-        const centralCommandPath = await ensureCentralCommandFile(commandName, allSources);
-        if (!centralCommandPath) {
-          message.error(t('commandsSync.removeBackupNotFound'));
-          return;
-        }
+  const handleConfirmRemove = useCallback(async () => {
+    if (!confirmDialog) return;
+    const { commandName, toolId, targetName } = confirmDialog;
 
-        const ok = await removeCommandFromTool(commandName, toolId);
-        if (ok) {
-          updateCommandStatus(commandName, toolId, false);
-          await loadAllCommands();
-          message.success(t('commandsSync.removeSuccess', { targetName }));
-        }
-      },
-    });
-  }, [
-    commandTools,
-    ensureCentralCommandFile,
-    getAllSourceTools,
-    loadAllCommands,
-    removeCommandFromTool,
-    t,
-    updateCommandStatus,
-  ]);
+    const allSources = getAllSourceTools(commandName);
+    const centralCommandPath = await ensureCentralCommandFile(commandName, allSources);
+    if (!centralCommandPath) {
+      toast.error(t('commandsSync.removeBackupNotFound'));
+      setConfirmDialog(null);
+      return;
+    }
+
+    const ok = await removeCommandFromTool(commandName, toolId);
+    if (ok) {
+      updateCommandStatus(commandName, toolId, false);
+      await loadAllCommands();
+      toast.success(t('commandsSync.removeSuccess', { targetName }));
+    }
+    setConfirmDialog(null);
+  }, [confirmDialog, ensureCentralCommandFile, getAllSourceTools, loadAllCommands, removeCommandFromTool, t, updateCommandStatus]);
 
   const handleToggleTool = useCallback(async (commandName: string, toolId: AiToolId, enabled: boolean): Promise<void> => {
     if (enabled) {
@@ -325,7 +343,7 @@ function CommandsSync(): JSX.Element {
         const filePath = await getCentralCommandPath(commandName);
         const writeResult = await window.electronAPI.writeFile(filePath, content);
         if (!writeResult.success) {
-          message.error(t('commandsSync.saveFailed', { error: writeResult.error ?? t('common.unknownError') }));
+          toast.error(t('commandsSync.saveFailed', { error: writeResult.error ?? t('common.unknownError') }));
           return;
         }
 
@@ -343,7 +361,7 @@ function CommandsSync(): JSX.Element {
 
         const failed = syncResults.find((result) => !result.success);
         if (failed) {
-          message.error(t('commandsSync.syncToToolsFailed', { error: failed.error ?? t('common.unknownError') }));
+          toast.error(t('commandsSync.syncToToolsFailed', { error: failed.error ?? t('common.unknownError') }));
         }
       })();
     }, 1000),
@@ -421,14 +439,14 @@ function CommandsSync(): JSX.Element {
         }
       }
 
-      message.success(t('commandsSync.addSuccess', { count: uploadedFiles.length }));
+      toast.success(t('commandsSync.addSuccess', { count: uploadedFiles.length }));
       setAddModalOpen(false);
       setUploadedFiles([]);
 
       // 刷新命令列表
       await loadAllCommands();
     } catch (error) {
-      message.error(t('commandsSync.addFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
+      toast.error(t('commandsSync.addFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
     } finally {
       setAddLoading(false);
     }
@@ -453,7 +471,7 @@ function CommandsSync(): JSX.Element {
       if (!filePath) {
         if (!cancelled) {
           setEditContent('');
-          message.error(t('commandsSync.readNoEditable'));
+          toast.error(t('commandsSync.readNoEditable'));
           setEditLoading(false);
         }
         return;
@@ -464,7 +482,7 @@ function CommandsSync(): JSX.Element {
 
       if (!result.success) {
         setEditContent('');
-        message.error(t('commandsSync.readFailed', { error: result.error ?? t('common.unknownError') }));
+        toast.error(t('commandsSync.readFailed', { error: result.error ?? t('common.unknownError') }));
       } else {
         setEditContent(result.content ?? '');
       }
@@ -496,17 +514,11 @@ function CommandsSync(): JSX.Element {
   let content: JSX.Element;
 
   if (isLoading && commands.length === 0) {
-    content = (
-      <div className="flex justify-center py-16">
-        <Spin tip={t('common.loading')}>
-          <div className="p-12" />
-        </Spin>
-      </div>
-    );
+    content = <Spinner tip={t('common.loading')} />;
   } else if (commandTools.length === 0) {
-    content = <Empty description={t('commandsSync.emptyUnsupportedTools')} />;
+    content = <EmptyState description={t('commandsSync.emptyUnsupportedTools')} />;
   } else if (commands.length === 0) {
-    content = <Empty description={t('commandsSync.emptyNoCommands')} />;
+    content = <EmptyState description={t('commandsSync.emptyNoCommands')} />;
   } else {
     content = (
       <div className="grid grid-cols-3 gap-4">
@@ -528,13 +540,16 @@ function CommandsSync(): JSX.Element {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-medium">{t('commandsSync.title')}</h2>
         <div className="flex gap-2">
-          <Button icon={<FolderOutlined />} onClick={() => void handleOpenFolder()}>
+          <Button variant="outline" onClick={() => void handleOpenFolder()}>
+            <Icon icon="mdi:folder-outline" width={16} height={16} />
             {t('commandsSync.openFolder')}
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
+          <Button onClick={() => setAddModalOpen(true)}>
+            <Icon icon="mdi:plus" width={16} height={16} />
             {t('commandsSync.addCommand')}
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => void loadAllCommands()} loading={isLoading}>
+          <Button variant="outline" onClick={() => void loadAllCommands()} disabled={isLoading}>
+            <Icon icon="mdi:refresh" width={16} height={16} />
             {t('common.refresh')}
           </Button>
         </div>
@@ -542,90 +557,98 @@ function CommandsSync(): JSX.Element {
 
       {content}
 
-      <Modal
-        title={
-          editRequest
-            ? t('commandsSync.editModalTitle', { commandName: editRequest.commandName })
-            : t('commandsSync.editModalTitleDefault')
-        }
-        open={editModalOpen}
-        onCancel={handleEditCancel}
-        footer={null}
-        width={960}
-        destroyOnHidden
-      >
-        {editRequest ? (
-          <div className="space-y-3">
-            {editLoading ? (
-              <div className="flex justify-center py-12">
-                <Spin>
-                  <div className="p-12" />
-                </Spin>
-              </div>
-            ) : (
-              <CodeEditor
-                height={COMMAND_EDITOR_HEIGHT}
-                language="markdown"
-                value={editContent}
-                onChange={handleContentChange}
-              />
-            )}
-          </div>
-        ) : null}
-      </Modal>
+      {/* 编辑 Command 对话框 */}
+      <Dialog open={editModalOpen} onOpenChange={(open) => { if (!open) handleEditCancel(); }}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editRequest
+                ? t('commandsSync.editModalTitle', { commandName: editRequest.commandName })
+                : t('commandsSync.editModalTitleDefault')}
+            </DialogTitle>
+          </DialogHeader>
+          {editRequest ? (
+            <div className="space-y-3">
+              {editLoading ? (
+                <Spinner />
+              ) : (
+                <CodeEditor
+                  height={COMMAND_EDITOR_HEIGHT}
+                  language="markdown"
+                  value={editContent}
+                  onChange={handleContentChange}
+                />
+              )}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
-      <Modal
-        title={t('commandsSync.addModalTitle')}
-        open={addModalOpen}
-        onCancel={handleAddModalClose}
-        footer={null}
-        width={600}
-        destroyOnHidden
-      >
-        <Upload
-          accept={ACCEPTED_COMMAND_EXTENSIONS.join(',')}
-          multiple
-          showUploadList={false}
-          beforeUpload={(file) => {
-            handleFilesAdded([file as RcFile]);
-            // 阻止实际上传
-            return false;
-          }}
-        >
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors">
-            <InboxOutlined className="text-4xl text-gray-400 mb-2" />
-            <p className="text-gray-600">{t('commandsSync.dragAreaMessage')}</p>
-          </div>
-        </Upload>
+      {/* 添加 Command 对话框 */}
+      <Dialog open={addModalOpen} onOpenChange={(open) => { if (!open) handleAddModalClose(); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t('commandsSync.addModalTitle')}</DialogTitle>
+          </DialogHeader>
 
-        {uploadedFiles.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium mb-2">{t('commandsSync.selectedFiles', { count: uploadedFiles.length })}</h4>
-            <ul className="space-y-1">
-              {uploadedFiles.map((file) => (
-                <li key={file.name} className="flex items-center gap-2 text-sm">
-                  <FileOutlined />
-                  <span>{file.name}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="mt-4 flex justify-end gap-2">
-          <Button onClick={handleAddModalClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            type="primary"
-            loading={addLoading}
-            disabled={uploadedFiles.length === 0}
-            onClick={() => void handleAddCommands()}
+          <FileUpload
+            accept={ACCEPTED_COMMAND_EXTENSIONS.join(',')}
+            multiple
+            onFilesSelected={handleFilesAdded}
           >
-            {t('commandsSync.confirmAdd')}
-          </Button>
-        </div>
-      </Modal>
+            <Icon icon="mdi:inbox-arrow-down" className="text-muted-foreground/50" width={40} height={40} />
+            <p className="text-sm text-muted-foreground">{t('commandsSync.dragAreaMessage')}</p>
+          </FileUpload>
+
+          {uploadedFiles.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">{t('commandsSync.selectedFiles', { count: uploadedFiles.length })}</h4>
+              <ul className="space-y-1">
+                {uploadedFiles.map((file) => (
+                  <li key={file.name} className="flex items-center gap-2 text-sm">
+                    <Icon icon="mdi:file-outline" width={16} height={16} />
+                    <span>{file.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={handleAddModalClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              disabled={uploadedFiles.length === 0 || addLoading}
+              onClick={() => void handleAddCommands()}
+            >
+              {addLoading && <Icon icon="svg-spinners:ring-resize" width={16} height={16} />}
+              {t('commandsSync.confirmAdd')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认对话框 */}
+      <AlertDialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('commandsSync.confirmRemoveTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('commandsSync.confirmRemoveContent', {
+                targetName: confirmDialog?.targetName,
+                commandName: confirmDialog?.commandName,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleConfirmRemove()}>
+              {t('common.remove')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

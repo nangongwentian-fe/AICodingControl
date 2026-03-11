@@ -1,7 +1,21 @@
 import type { AiTool, McpServerWithStatus } from './types';
-import { Avatar, Button, Card, Popconfirm, Switch } from 'antd';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useAiTools } from '@/hooks/useAiTools';
 
 interface McpServerCardProps {
@@ -21,39 +35,54 @@ const McpServerCard = memo<McpServerCardProps>(({
   const { mcpTools } = useAiTools();
 
   return (
-    <Card
-      title={server.name}
-      hoverable
-      extra={(
+    <Card className="hover:shadow-md transition-shadow">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-base">{server.name}</CardTitle>
         <div className="flex gap-2">
-          <Button size="small" onClick={() => onEdit(server)}>{t('mcpSync.card.editButton')}</Button>
-          <Popconfirm
-            title={t('mcpSync.card.confirmDeleteTitle')}
-            description={t('mcpSync.card.confirmDeleteDescription', { serverName: server.name })}
-            onConfirm={() => void onDelete(server.name)}
-            okText={t('common.confirm')}
-            cancelText={t('common.cancel')}
-          >
-            <Button size="small" danger>{t('mcpSync.card.deleteButton')}</Button>
-          </Popconfirm>
+          <Button variant="outline" size="sm" onClick={() => onEdit(server)}>
+            {t('mcpSync.card.editButton')}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">{t('mcpSync.card.deleteButton')}</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('mcpSync.card.confirmDeleteTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('mcpSync.card.confirmDeleteDescription', { serverName: server.name })}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={() => void onDelete(server.name)}>
+                  {t('common.confirm')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
-      )}
-    >
-      <div className="flex flex-col">
-        {mcpTools.map(tool => (
-          <div key={tool.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-            <div className="flex items-center gap-2">
-              {tool.logoSrc && <Avatar src={tool.logoSrc} size="small" shape="square" />}
-              <span>{tool.name}</span>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col">
+          {mcpTools.map(tool => (
+            <div key={tool.id} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
+              <div className="flex items-center gap-2">
+                {tool.logoSrc && (
+                  <Avatar className="h-6 w-6 rounded-sm">
+                    <AvatarImage src={tool.logoSrc} />
+                  </Avatar>
+                )}
+                <span className="text-sm">{tool.name}</span>
+              </div>
+              <Switch
+                checked={server.toolStatus[tool.id as AiTool]}
+                onCheckedChange={checked => void onToggleTool(server.name, tool.id, checked)}
+              />
             </div>
-            <Switch
-              size="small"
-              checked={server.toolStatus[tool.id as AiTool]}
-              onChange={checked => void onToggleTool(server.name, tool.id, checked)}
-            />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </CardContent>
     </Card>
   );
 });

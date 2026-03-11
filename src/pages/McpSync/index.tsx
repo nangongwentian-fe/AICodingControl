@@ -1,10 +1,13 @@
 import type { AiTool, McpServer, McpServerConfig, McpServerWithStatus, McpToolStatus } from './types';
 import type { AiToolWithLogo } from '@/hooks/useAiTools';
-import { Button, Empty, message, Spin } from 'antd';
+import { toast } from 'sonner';
+import { Icon } from '@iconify/react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import * as TOML from 'smol-toml';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath } from '@/utils/path';
 import { exportToToolFormat, importFromToolFormat, isValidMcpConfigRecord } from './adapters';
@@ -21,10 +24,8 @@ const McpSync = memo(() => {
   const [loading, setLoading] = useState(false);
   const filePathRef = useRef('');
 
-  // 使用 useAiTools hook 获取 mcpTools
   const { mcpTools, loading: toolsLoading } = useAiTools();
 
-  // 创建空的工具状态（基于 mcpTools 动态生成）
   const createEmptyToolStatus = useCallback((): McpToolStatus => {
     return mcpTools.reduce((acc, tool) => {
       acc[tool.id as AiTool] = false;
@@ -32,17 +33,12 @@ const McpSync = memo(() => {
     }, {} as McpToolStatus);
   }, [mcpTools]);
 
-
-
-  // 保存 MCP 列表到本地文件
   const saveMcpServers = useCallback(async (servers: McpServerWithStatus[]) => {
     if (!filePathRef.current) return;
-    // 只保存基本信息，不保存 toolStatus
     const data: McpServer[] = servers.map(({ name, config }) => ({ name, config }));
     await window.electronAPI.writeFile(filePathRef.current, JSON.stringify(data, null, 2));
   }, []);
 
-  // 从单个工具读取 MCP 配置
   const readToolConfig = useCallback(async (tool: AiToolWithLogo): Promise<McpServer[]> => {
     if (!tool.mcpConfigPath || !tool.mcpConfigKey || !tool.mcpFormat) return [];
 
@@ -67,13 +63,11 @@ const McpSync = memo(() => {
     }
   }, []);
 
-  // 从所有工具读取并合并 MCP 配置
   const loadAllMcpServers = useCallback(async () => {
     if (mcpTools.length === 0) return;
 
     setLoading(true);
 
-    // 并行读取所有工具的配置
     const results = await Promise.all(
       mcpTools.map(async (tool) => {
         const servers = await readToolConfig(tool);
@@ -81,17 +75,14 @@ const McpSync = memo(() => {
       }),
     );
 
-    // 合并去重：以 name 为 key
     const serverMap = new Map<string, McpServerWithStatus>();
 
     for (const { toolId, servers } of results) {
       for (const server of servers) {
         const existing = serverMap.get(server.name);
         if (existing) {
-          // 已存在，更新工具状态
           existing.toolStatus[toolId as AiTool] = true;
         } else {
-          // 新增
           const toolStatus = createEmptyToolStatus();
           toolStatus[toolId as AiTool] = true;
           serverMap.set(server.name, {
@@ -105,13 +96,11 @@ const McpSync = memo(() => {
     const mergedServers = Array.from(serverMap.values());
     setMcpServers(mergedServers);
 
-    // 持久化到本地 mcp.json
     await saveMcpServers(mergedServers);
 
     setLoading(false);
   }, [mcpTools, readToolConfig, saveMcpServers, createEmptyToolStatus]);
 
-  // 写入单个工具的配置
   const writeToolConfig = useCallback(async (
     tool: AiToolWithLogo,
     servers: McpServer[],
@@ -121,7 +110,6 @@ const McpSync = memo(() => {
     const configPath = await expandPath(tool.mcpConfigPath);
     const { mcpFormat, mcpConfigKey } = tool;
 
-    // 读取现有配置
     let existingConfig: Record<string, unknown> = {};
     const readResult = await window.electronAPI.readFile(configPath);
     if (readResult.success && readResult.content) {
@@ -136,11 +124,9 @@ const McpSync = memo(() => {
       }
     }
 
-    // 导出为工具格式
     const exported = exportToToolFormat(servers, tool.id as AiTool);
     existingConfig[mcpConfigKey] = exported;
 
-    // 写入配置
     let content: string;
     if (mcpFormat === 'toml') {
       content = TOML.stringify(existingConfig);
@@ -151,7 +137,6 @@ const McpSync = memo(() => {
     await window.electronAPI.writeFile(configPath, content);
   }, []);
 
-  // 切换某个 MCP 在某个工具中的配置状态
   const handleToggleTool = useCallback(async (
     serverName: string,
     toolId: string,
@@ -161,7 +146,6 @@ const McpSync = memo(() => {
     if (!tool) return;
 
     try {
-      // 更新本地状态
       setMcpServers((prev) => {
         const newServers = prev.map((s) => {
           if (s.name === serverName) {
@@ -175,7 +159,6 @@ const McpSync = memo(() => {
         return newServers;
       });
 
-      // 获取该工具应该配置的所有 MCP
       const currentServers = mcpServers.map((s) => {
         if (s.name === serverName) {
           return { ...s, toolStatus: { ...s.toolStatus, [toolId]: enabled } };
@@ -187,17 +170,15 @@ const McpSync = memo(() => {
         .filter(s => s.toolStatus[toolId as AiTool])
         .map(({ name, config }) => ({ name, config }));
 
-      // 写入工具配置
       await writeToolConfig(tool, serversForTool);
 
-      message.success(
+      toast.success(
         enabled
           ? t('mcpSync.addedTo', { toolName: tool.name })
           : t('mcpSync.removedFrom', { toolName: tool.name }),
       );
     } catch (error) {
-      message.error(t('mcpSync.actionFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
-      // 回滚状态
+      toast.error(t('mcpSync.actionFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
       setMcpServers((prev) => {
         return prev.map((s) => {
           if (s.name === serverName) {
@@ -212,15 +193,12 @@ const McpSync = memo(() => {
     }
   }, [mcpServers, mcpTools, t, writeToolConfig]);
 
-  // 使用 ref 存储函数引用，避免 useEffect 依赖问题
   const loadAllMcpServersRef = useRef(loadAllMcpServers);
 
-  // 保持 ref 最新
   useEffect(() => {
     loadAllMcpServersRef.current = loadAllMcpServers;
   }, [loadAllMcpServers]);
 
-  // 当 mcpTools 加载完成后初始化
   useEffect(() => {
     if (toolsLoading || mcpTools.length === 0) return;
 
@@ -232,25 +210,21 @@ const McpSync = memo(() => {
     void init();
   }, [toolsLoading, mcpTools.length]);
 
-  // 新增 MCP
   const handleAdd = () => {
     setEditingServer(null);
     setModalOpen(true);
   };
 
-  // 编辑 MCP
   const handleEdit = (server: McpServerWithStatus) => {
     setEditingServer(server);
     setModalOpen(true);
   };
 
-  // 删除 MCP
   const handleDelete = async (serverName: string) => {
     const server = mcpServers.find(s => s.name === serverName);
     if (!server) return;
 
     try {
-      // 从所有已配置的工具中移除（并行执行）
       const toolsToUpdate = mcpTools.filter(t => server.toolStatus[t.id as AiTool]);
 
       await Promise.all(
@@ -262,20 +236,18 @@ const McpSync = memo(() => {
         }),
       );
 
-      // 更新本地状态
       setMcpServers((prev) => {
         const newServers = prev.filter(s => s.name !== serverName);
         void saveMcpServers(newServers);
         return newServers;
       });
 
-      message.success(t('mcpSync.deleteSuccess'));
+      toast.success(t('mcpSync.deleteSuccess'));
     } catch (error) {
-      message.error(t('mcpSync.deleteFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
+      toast.error(t('mcpSync.deleteFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
     }
   };
 
-  // 保存新增/编辑的 MCP
   const handleModalOk = async (name: string, config: McpServerConfig) => {
     const newServer: McpServerWithStatus = {
       name,
@@ -284,7 +256,6 @@ const McpSync = memo(() => {
     };
 
     if (editingServer) {
-      // 编辑模式：更新所有已配置的工具
       const toolsToUpdate = mcpTools.filter(t => newServer.toolStatus[t.id as AiTool]);
 
       for (const tool of toolsToUpdate) {
@@ -301,7 +272,6 @@ const McpSync = memo(() => {
         return newServers;
       });
     } else {
-      // 新增模式
       setMcpServers((prev) => {
         const newServers = [...prev, newServer];
         void saveMcpServers(newServers);
@@ -312,7 +282,6 @@ const McpSync = memo(() => {
     setModalOpen(false);
   };
 
-  // 显示 loading 状态
   const isLoading = toolsLoading || loading;
 
   return (
@@ -320,23 +289,21 @@ const McpSync = memo(() => {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-medium">{t('mcpSync.title')}</h2>
         <div className="flex gap-2">
-          <Button icon={<ReloadOutlined />} onClick={() => void loadAllMcpServers()} loading={isLoading}>
+          <Button variant="outline" onClick={() => void loadAllMcpServers()} disabled={isLoading}>
+            <Icon icon="mdi:refresh" width={16} height={16} />
             {t('common.refresh')}
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+          <Button onClick={handleAdd}>
+            <Icon icon="mdi:plus" width={16} height={16} />
             {t('mcpSync.addMcp')}
           </Button>
         </div>
       </div>
 
       {isLoading && mcpServers.length === 0 ? (
-        <div className="flex justify-center py-16">
-          <Spin tip={t('common.loading')}>
-            <div className="p-12" />
-          </Spin>
-        </div>
+        <Spinner tip={t('common.loading')} />
       ) : mcpServers.length === 0 ? (
-        <Empty description={t('mcpSync.empty')} />
+        <EmptyState description={t('mcpSync.empty')} />
       ) : (
         <div className="grid grid-cols-3 gap-4">
           {mcpServers.map(server => (
@@ -351,7 +318,6 @@ const McpSync = memo(() => {
         </div>
       )}
 
-      {/* 新增/编辑 MCP 弹窗 */}
       <McpServerModal
         open={modalOpen}
         editingServer={editingServer}

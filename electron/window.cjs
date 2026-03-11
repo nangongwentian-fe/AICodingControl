@@ -9,7 +9,7 @@ function createWindow(isDev) {
     frame: false,
     transparent: true,
     title: APP_NAME,
-    titleBarStyle: 'hidden',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

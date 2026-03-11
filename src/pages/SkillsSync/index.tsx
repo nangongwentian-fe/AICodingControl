@@ -1,13 +1,26 @@
 import type { AiToolId } from '@/types/ai-tools';
 import type { SkillItem, SkillTool, SkillToolStatus } from './types';
-import { Button, Empty, message, Modal, Spin } from 'antd';
+import { toast } from 'sonner';
+import { Icon } from '@iconify/react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ReloadOutlined } from '@ant-design/icons';
 import compact from 'lodash/compact';
 import keyBy from 'lodash/keyBy';
 import some from 'lodash/some';
 import sortBy from 'lodash/sortBy';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAiTools } from '@/hooks/useAiTools';
 import { expandPath, joinPath } from '@/utils/path';
 import SkillCard from './SkillCard';
@@ -17,6 +30,11 @@ function SkillsSync(): JSX.Element {
   const { t } = useTranslation();
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    skillName: string;
+    toolId: AiToolId;
+    targetName: string;
+  } | null>(null);
 
   const { tools, loading: toolsLoading } = useAiTools();
 
@@ -38,8 +56,6 @@ function SkillsSync(): JSX.Element {
       return acc;
     }, {} as SkillToolStatus);
   }, [skillTools]);
-
-
 
   const filterSkillFolders = useCallback(async (rootPath: string, entries: string[]): Promise<string[]> => {
     const checks = await Promise.all(
@@ -82,7 +98,7 @@ function SkillsSync(): JSX.Element {
       .map((item) => item.value);
 
     if (fulfilled.length !== settled.length) {
-      message.error(t('skillsSync.partialReadFailed'));
+      toast.error(t('skillsSync.partialReadFailed'));
     }
 
     const skillMap = new Map<string, SkillItem>();
@@ -135,21 +151,19 @@ function SkillsSync(): JSX.Element {
     return skillTools.filter((tool) => tool.id !== targetToolId && skill.toolStatus[tool.id as AiToolId]);
   }, [skillTools, skillsByName]);
 
-  /** 为目标工具启用 skill：从源工具复制 skill 到目标工具 */
   const enableSkillForTool = useCallback(async (
     skillName: string,
     targetToolId: AiToolId,
   ): Promise<boolean> => {
     const targetTool = skillTools.find((tool) => tool.id === targetToolId);
     if (!targetTool) {
-      message.error(t('skillsSync.toolConfigNotFound'));
+      toast.error(t('skillsSync.toolConfigNotFound'));
       return false;
     }
 
-    // 从已有的源工具复制
     const sources = getSourceTools(skillName, targetToolId);
     if (sources.length === 0) {
-      message.error(t('skillsSync.sourceNotFound'));
+      toast.error(t('skillsSync.sourceNotFound'));
       return false;
     }
 
@@ -158,10 +172,9 @@ function SkillsSync(): JSX.Element {
     const targetRoot = await expandPath(targetTool.skillsPath);
     const targetPath = joinPath(targetRoot, skillName);
 
-    // 复制到目标工具目录
     const copyResult = await window.electronAPI.copyDir(sourcePath, targetPath);
     if (!copyResult.success) {
-      message.error(t('skillsSync.copyFailed', { error: copyResult.error ?? t('common.unknownError') }));
+      toast.error(t('skillsSync.copyFailed', { error: copyResult.error ?? t('common.unknownError') }));
       return false;
     }
 
@@ -171,7 +184,7 @@ function SkillsSync(): JSX.Element {
   const removeSkillFromTool = useCallback(async (skillName: string, toolId: AiToolId): Promise<boolean> => {
     const tool = skillTools.find((item) => item.id === toolId);
     if (!tool) {
-      message.error(t('skillsSync.toolConfigNotFound'));
+      toast.error(t('skillsSync.toolConfigNotFound'));
       return false;
     }
 
@@ -180,7 +193,7 @@ function SkillsSync(): JSX.Element {
     const result = await window.electronAPI.removeDir(targetPath);
 
     if (!result.success) {
-      message.error(t('skillsSync.removeFailed', { error: result.error ?? t('common.unknownError') }));
+      toast.error(t('skillsSync.removeFailed', { error: result.error ?? t('common.unknownError') }));
       return false;
     }
 
@@ -193,7 +206,7 @@ function SkillsSync(): JSX.Element {
     updateSkillStatus(skillName, toolId, true);
     const ok = await enableSkillForTool(skillName, toolId);
     if (ok) {
-      message.success(t('skillsSync.syncSuccess', { toolName: targetToolName }));
+      toast.success(t('skillsSync.syncSuccess', { toolName: targetToolName }));
     } else {
       updateSkillStatus(skillName, toolId, false);
     }
@@ -202,21 +215,19 @@ function SkillsSync(): JSX.Element {
   const handleDisableSkill = useCallback((skillName: string, toolId: AiToolId): void => {
     const targetTool = skillTools.find((tool) => tool.id === toolId);
     const targetName = targetTool?.name ?? t('common.targetTool');
+    setConfirmDialog({ skillName, toolId, targetName });
+  }, [skillTools, t]);
 
-    Modal.confirm({
-      title: t('skillsSync.confirmRemoveTitle'),
-      content: t('skillsSync.confirmRemoveContent', { targetName, skillName }),
-      okText: t('common.remove'),
-      cancelText: t('common.cancel'),
-      onOk: async () => {
-        const ok = await removeSkillFromTool(skillName, toolId);
-        if (ok) {
-          updateSkillStatus(skillName, toolId, false);
-          message.success(t('skillsSync.removeSuccess', { targetName }));
-        }
-      },
-    });
-  }, [removeSkillFromTool, skillTools, t, updateSkillStatus]);
+  const handleConfirmRemove = useCallback(async () => {
+    if (!confirmDialog) return;
+    const { skillName, toolId, targetName } = confirmDialog;
+    const ok = await removeSkillFromTool(skillName, toolId);
+    if (ok) {
+      updateSkillStatus(skillName, toolId, false);
+      toast.success(t('skillsSync.removeSuccess', { targetName }));
+    }
+    setConfirmDialog(null);
+  }, [confirmDialog, removeSkillFromTool, t, updateSkillStatus]);
 
   const handleToggleTool = useCallback(async (skillName: string, toolId: AiToolId, enabled: boolean): Promise<void> => {
     if (enabled) {
@@ -244,17 +255,11 @@ function SkillsSync(): JSX.Element {
   let content: JSX.Element;
 
   if (isLoading && skills.length === 0) {
-    content = (
-      <div className="flex justify-center py-16">
-        <Spin tip={t('common.loading')}>
-          <div className="p-12" />
-        </Spin>
-      </div>
-    );
+    content = <Spinner tip={t('common.loading')} />;
   } else if (skillTools.length === 0) {
-    content = <Empty description={t('skillsSync.emptyUnsupportedTools')} />;
+    content = <EmptyState description={t('skillsSync.emptyUnsupportedTools')} />;
   } else if (skills.length === 0) {
-    content = <Empty description={t('skillsSync.emptyNoSkills')} />;
+    content = <EmptyState description={t('skillsSync.emptyNoSkills')} />;
   } else {
     content = (
       <div className="grid grid-cols-3 gap-4">
@@ -275,19 +280,37 @@ function SkillsSync(): JSX.Element {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-medium">{t('skillsSync.title')}</h2>
         <div className="flex gap-2">
-          <Button icon={<ReloadOutlined />} onClick={() => void loadAllSkills()} loading={isLoading}>
+          <Button variant="outline" onClick={() => void loadAllSkills()} disabled={isLoading}>
+            <Icon icon="mdi:refresh" width={16} height={16} />
             {t('common.refresh')}
           </Button>
-          <Button
-            type="primary"
-            onClick={() => window.electronAPI.openExternal('https://skills.sh/')}
-          >
+          <Button onClick={() => window.electronAPI.openExternal('https://skills.sh/')}>
             {t('skillsSync.installSkills')}
           </Button>
         </div>
       </div>
 
       {content}
+
+      <AlertDialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('skillsSync.confirmRemoveTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('skillsSync.confirmRemoveContent', {
+                targetName: confirmDialog?.targetName,
+                skillName: confirmDialog?.skillName,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleConfirmRemove()}>
+              {t('common.remove')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

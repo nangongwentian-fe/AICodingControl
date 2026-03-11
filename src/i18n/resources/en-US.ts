@@ -14,6 +14,7 @@ const enUS = {
   },
   header: {
     appTitle: 'AI Coding Control',
+    workspaceLabel: 'Workspace',
     languageZhCN: '简中',
     languageEnUS: 'EN',
   },

@@ -14,6 +14,7 @@ const zhCN = {
   },
   header: {
     appTitle: 'AI Coding Control',
+    workspaceLabel: '工作台',
     languageZhCN: '简中',
     languageEnUS: 'EN',
   },
